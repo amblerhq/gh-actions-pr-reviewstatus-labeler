@@ -1,0 +1,45 @@
+{
+  "name": "gh-actions-clubhouse-labeler",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Github Action to add/Remove labels on a Clubhouse story based on its linked Pull Request",
+  "main": "lib/main.js",
+  "scripts": {
+    "build": "tsc",
+    "format": "prettier --write **/*.ts",
+    "format-check": "prettier --check **/*.ts",
+    "lint": "eslint src/**/*.ts",
+    "package": "ncc build --source-map --license licenses.txt",
+    "all": "npm run build && npm run format && npm run lint && npm run package"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amblerhq/gh-actions-clubhouse-labeler"
+  },
+  "keywords": [
+    "actions",
+    "clubhouse",
+    "label"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.2.6",
+    "@actions/github": "^4.0.0",
+    "@octokit/action": "^3.1.6",
+    "@octokit/webhooks": "^7.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.9",
+    "@typescript-eslint/parser": "^4.8.1",
+    "@vercel/ncc": "^0.25.1",
+    "eslint": "^7.13.0",
+    "eslint-plugin-github": "^4.1.1",
+    "eslint-plugin-jest": "^23.20.0",
+    "eslint-plugin-prettier": "^3.3.1",
+    "js-yaml": "^3.14.0",
+    "prettier": "2.1.1",
+    "ts-node": "^9.1.1",
+    "typescript": "^4.0.2"
+  }
+}

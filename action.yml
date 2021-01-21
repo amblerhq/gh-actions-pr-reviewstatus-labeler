@@ -1,0 +1,10 @@
+name: 'Chab'
+description: 'Add/remove labels on a Clubhouse story based on its linked Pull Request'
+author: 'Ambler'
+inputs:
+  GITHUB_TOKEN:
+    required: true
+    description: 'Github OAuth token'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
