@@ -82,26 +82,7 @@
     "@nodelib/fs.scandir" "2.1.4"
     fastq "^1.6.0"
 
-"@octokit/action@^3.1.6":
-  version "3.1.6"
-  resolved "https://registry.yarnpkg.com/@octokit/action/-/action-3.1.6.tgz#9cbd463abb1b38a205183ee6ae46bad296839fe5"
-  integrity sha512-zqJqLWr483xeZw07iNPj1OmcHm4o6ZByklAX0cYPJPq3+qpgSkzVYXzWuXIehFw6tiIuVhEGuHH6PaQ8EO6rWw==
-  dependencies:
-    "@octokit/auth-action" "^1.2.0"
-    "@octokit/core" "^3.0.0"
-    "@octokit/plugin-paginate-rest" "^2.2.4"
-    "@octokit/plugin-rest-endpoint-methods" "4.4.1"
-    "@octokit/types" "^6.0.3"
-
-"@octokit/auth-action@^1.2.0":
-  version "1.3.1"
-  resolved "https://registry.yarnpkg.com/@octokit/auth-action/-/auth-action-1.3.1.tgz#dd275ade3f2334db0e9420ab7fa2cc368fce064d"
-  integrity sha512-97CoKXP00l/oJQil8TCSMiCQ0cFAzIE9uNSiaSFUxS7cD00eM52Q5U8icK1C00vCo6qZVtqBW4iDAYCbNitMjQ==
-  dependencies:
-    "@octokit/auth-token" "^2.4.0"
-    "@octokit/types" "^6.0.0"
-
-"@octokit/auth-token@^2.4.0", "@octokit/auth-token@^2.4.4":
+"@octokit/auth-token@^2.4.4":
   version "2.4.4"
   resolved "https://registry.yarnpkg.com/@octokit/auth-token/-/auth-token-2.4.4.tgz#ee31c69b01d0378c12fd3ffe406030f3d94d3b56"
   integrity sha512-LNfGu3Ro9uFAYh10MUZVaT7X2CnNm2C8IDQmabx+3DygYIQjs9FwzFAHN/0t6mu5HEPhxcb1XOuxdpY82vCg2Q==
@@ -143,20 +124,12 @@
   resolved "https://registry.yarnpkg.com/@octokit/openapi-types/-/openapi-types-3.0.0.tgz#f73d48af2d21bf4f97fbf38fae43b54699e0dbba"
   integrity sha512-jOp1CVRw+OBJaZtG9QzZggvJXvyzgDXuW948SWsDiwmyDuCjeYCiF3TDD/qvhpF580RfP7iBIos4AVU6yhgMlA==
 
-"@octokit/plugin-paginate-rest@^2.2.3", "@octokit/plugin-paginate-rest@^2.2.4":
+"@octokit/plugin-paginate-rest@^2.2.3":
   version "2.8.0"
   resolved "https://registry.yarnpkg.com/@octokit/plugin-paginate-rest/-/plugin-paginate-rest-2.8.0.tgz#2b41e12b494e895bf5fb5b12565d2c80a0ecc6ae"
   integrity sha512-HtuEQ2AYE4YFEBQN0iHmMsIvVucd5RsnwJmRKIsfAg1/ZeoMaU+jXMnTAZqIUEmcVJA27LjHUm3f1hxf8Fpdxw==
   dependencies:
     "@octokit/types" "^6.4.0"
-
-"@octokit/plugin-rest-endpoint-methods@4.4.1":
-  version "4.4.1"
-  resolved "https://registry.yarnpkg.com/@octokit/plugin-rest-endpoint-methods/-/plugin-rest-endpoint-methods-4.4.1.tgz#105cf93255432155de078c9efc33bd4e14d1cd63"
-  integrity sha512-+v5PcvrUcDeFXf8hv1gnNvNLdm4C0+2EiuWt9EatjjUmfriM1pTMM+r4j1lLHxeBQ9bVDmbywb11e3KjuavieA==
-  dependencies:
-    "@octokit/types" "^6.1.0"
-    deprecation "^2.3.1"
 
 "@octokit/plugin-rest-endpoint-methods@^4.0.0":
   version "4.5.2"
@@ -166,7 +139,7 @@
     "@octokit/types" "^6.3.2"
     deprecation "^2.3.1"
 
-"@octokit/request-error@^2.0.0", "@octokit/request-error@^2.0.2":
+"@octokit/request-error@^2.0.0":
   version "2.0.4"
   resolved "https://registry.yarnpkg.com/@octokit/request-error/-/request-error-2.0.4.tgz#07dd5c0521d2ee975201274c472a127917741262"
   integrity sha512-LjkSiTbsxIErBiRh5wSZvpZqT4t0/c9+4dOe0PII+6jXR+oj/h66s7E4a/MghV7iT8W9ffoQ5Skoxzs96+gBPA==
@@ -189,22 +162,13 @@
     once "^1.4.0"
     universal-user-agent "^6.0.0"
 
-"@octokit/types@^6.0.0", "@octokit/types@^6.0.3", "@octokit/types@^6.1.0", "@octokit/types@^6.3.2", "@octokit/types@^6.4.0":
+"@octokit/types@^6.0.0", "@octokit/types@^6.0.3", "@octokit/types@^6.3.2", "@octokit/types@^6.4.0":
   version "6.4.0"
   resolved "https://registry.yarnpkg.com/@octokit/types/-/types-6.4.0.tgz#f3f47be70bcdb3c26f2c2619f3dd0ced466a265c"
   integrity sha512-1FEmuVppZE2zG0rBdQlviRz5cp0udyI63zyhBVPrm0FRNAsQkAXU7IYWQg1XvhChFut8YbFYN1usQpk54D6/4w==
   dependencies:
     "@octokit/openapi-types" "^3.0.0"
     "@types/node" ">= 8"
-
-"@octokit/webhooks@^7.21.0":
-  version "7.21.0"
-  resolved "https://registry.yarnpkg.com/@octokit/webhooks/-/webhooks-7.21.0.tgz#2aee3404aa311740a5f4ea37b070268752e21b02"
-  integrity sha512-Mj7Pa6JZgSjfzQfYF3Bf5KpyhzEBv4kHbj2EjCB/vMQiZCiiW30j5rS6t/d0ZN0FBrlSOuJIT+YU8IJt30VyWA==
-  dependencies:
-    "@octokit/request-error" "^2.0.2"
-    aggregate-error "^3.1.0"
-    debug "^4.0.0"
 
 "@types/json-schema@^7.0.3":
   version "7.0.7"
@@ -306,14 +270,6 @@ acorn@^7.4.0:
   version "7.4.1"
   resolved "https://registry.yarnpkg.com/acorn/-/acorn-7.4.1.tgz#feaed255973d2e77555b83dbc08851a6c63520fa"
   integrity sha512-nQyp0o1/mNdbTO1PO6kHkwSrmgZ0MT/jCCpNiwbUjGoRN4dlBhqJtoQuCnEOKzgTVwg0ZWiCoQy6SxMebQVh8A==
-
-aggregate-error@^3.1.0:
-  version "3.1.0"
-  resolved "https://registry.yarnpkg.com/aggregate-error/-/aggregate-error-3.1.0.tgz#92670ff50f5359bdb7a3e0d40d0ec30c5737687a"
-  integrity sha512-4I7Td01quW/RpocfNayFdFVk1qSuoh0E7JrbRJ16nH01HhKFQ88INq9Sd+nd72zqRySlr9BmDA8xlEJ6vJMrYA==
-  dependencies:
-    clean-stack "^2.0.0"
-    indent-string "^4.0.0"
 
 ajv@^6.10.0, ajv@^6.12.4:
   version "6.12.6"
@@ -466,11 +422,6 @@ chalk@^4.0.0:
     ansi-styles "^4.1.0"
     supports-color "^7.1.0"
 
-clean-stack@^2.0.0:
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/clean-stack/-/clean-stack-2.2.0.tgz#ee8472dbb129e727b31e8a10a427dee9dfe4008b"
-  integrity sha512-4diC9HaTE+KRAMWhDhrGOECgWZxoevMc5TlkObMqNSsVU62PYzXZ/SMTjzyGAFF1YusgxGcSWTEXBhp0CPwQ1A==
-
 color-convert@^1.9.0:
   version "1.9.3"
   resolved "https://registry.yarnpkg.com/color-convert/-/color-convert-1.9.3.tgz#bb71850690e1f136567de629d2d5471deda4c1e8"
@@ -526,7 +477,7 @@ debug@^2.6.9:
   dependencies:
     ms "2.0.0"
 
-debug@^4.0.0, debug@^4.0.1, debug@^4.1.1:
+debug@^4.0.1, debug@^4.1.1:
   version "4.3.1"
   resolved "https://registry.yarnpkg.com/debug/-/debug-4.3.1.tgz#f0d229c505e0c6d8c49ac553d1b13dc183f6b2ee"
   integrity sha512-doEwdvm4PCeK4K3RQN2ZC2BYUBaxwLARCqZmMjtF8a51J2Rb0xpVloFRnCODwqjpwnAoao4pelN8l3RJdv3gRQ==
@@ -1005,11 +956,6 @@ imurmurhash@^0.1.4:
   version "0.1.4"
   resolved "https://registry.yarnpkg.com/imurmurhash/-/imurmurhash-0.1.4.tgz#9218b9b2b928a238b13dc4fb6b6d576f231453ea"
   integrity sha1-khi5srkoojixPcT7a21XbyMUU+o=
-
-indent-string@^4.0.0:
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/indent-string/-/indent-string-4.0.0.tgz#624f8f4497d619b2d9768531d58f4122854d7251"
-  integrity sha512-EdDDZu4A2OyIK7Lr/2zG+w5jmbuk1DVBnEwREQvBzspBJkCEbRa8GxU1lghYcaGJCnRWibjDXlq779X1/y5xwg==
 
 inflight@^1.0.4:
   version "1.0.6"
@@ -1678,7 +1624,7 @@ type-fest@^0.8.1:
   resolved "https://registry.yarnpkg.com/type-fest/-/type-fest-0.8.1.tgz#09e249ebde851d3b1e48d27c105444667f17b83d"
   integrity sha512-4dbzIzqvjtgiM5rw1k5rEHtBANKmdudhGyBEajN01fEyhaAIhsoKNy6y7+IN93IfpFtwY9iqi7kD+xwKhQsNJA==
 
-typescript@^4.0.2:
+typescript@^4.1.0:
   version "4.1.3"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.1.3.tgz#519d582bd94cba0cf8934c7d8e8467e473f53bb7"
   integrity sha512-B3ZIOf1IKeH2ixgHhj6la6xdwR9QrLC5d1VKeCSY4tvkqhF2eqd9O7txNlS0PO3GrBAFIdr3L1ndNwteUbZLYg==
