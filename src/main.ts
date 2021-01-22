@@ -30,6 +30,8 @@ function extractStoryIds(content: string): string[] {
   return unique
 }
 
+//type Label = 'TO_REVIEW' | 'TO_CHANGE' | 'TO_MERGE' | 'TO_REBASE'
+
 async function run(): Promise<void> {
   try {
     const {eventName} = github.context
@@ -50,27 +52,100 @@ async function run(): Promise<void> {
 
       core.info('Fetching PR reviewDecision')
       const {
-        repository: {
-          pullRequest: {reviewDecision}
-        }
-      } = await octokit.graphql(
-        `
-        query getReviewDecision($owner: String!, $repo: String!, $number: Int!) {
-          repository(owner: $owner, name: $repo) {
-            id
-            pullRequest(number: $number) {
-              reviewDecision
-            }
-          }
-        }
-        `,
+        data: {draft, mergeable, state}
+      } = await octokit.pulls.get({owner, repo, pull_number: number})
+      const {data: reviewRequests} = await octokit.pulls.listRequestedReviewers(
         {
           owner,
           repo,
-          number
+          pull_number: number
         }
       )
-      core.info(`reviewDecision: ${reviewDecision}`)
+      const {data: reviews} = await octokit.pulls.listReviews({
+        owner,
+        repo,
+        pull_number: number
+      })
+
+      // const {
+      //   repository: {
+      //     pullRequest: {
+      //       reviewDecision,
+      //       state,
+      //       isDraft,
+      //       mergeable,
+      //       reviewRequests: {nodes: requestedReviewers},
+      //       reviews: {nodes: existingReviews}
+      //     }
+      //   }
+      // } = await octokit.graphql(
+      //   `
+      //   query getReviewDecision($owner: String!, $repo: String!, $number: Int!) {
+      //     repository(owner: $owner, name: $repo) {
+      //       id
+      //       pullRequest(number: $number) {
+      //         state
+      //         isDraft
+      //         mergeable
+      //         reviewRequests(last: 50) {
+      //           nodes {
+      //             requestedReviewer {
+      //               ... on User {
+      //                 login
+      //               }
+      //             }
+      //           }
+      //         }
+      //         reviews(first: 100) {
+      //           nodes {
+      //             state
+      //             author {
+      //               login
+      //             }
+      //           }
+      //         }
+      //         reviewDecision
+      //       }
+      //     }
+      //   }
+      //   `,
+      //   {
+      //     owner,
+      //     repo,
+      //     number
+      //   }
+      // )
+      // core.info(`reviewDecision: ${reviewDecision}`)
+
+      // const validLabels: Label[] = (() => {
+      //   if (isDraft || state !== 'OPEN') {
+      //     return []
+      //   }
+      //   const labels: Label[] = []
+      //   if (mergeable === 'CONFLICTING') {
+      //     labels.push('TO_REBASE')
+      //   }
+
+      //   if (reviewDecision === 'REVIEW_REQUIRED') {
+      //     if (reviewRequests.length > O) {
+      //       labels.push('TO_REVIEW')
+      //     }
+      //   } else if (reviewDecision === 'CHANGES_REQUESTED') {
+      //     if (existingReviews.find(review => )
+      //   } else if (reviewDecision === 'APPROVED') {
+      //   }
+      //   return labels
+      // })()
+      //core.info(`validLabels : ${JSON.stringify(validLabels)}`)
+      core.info(
+        `data : ${JSON.stringify({
+          draft,
+          mergeable,
+          state,
+          reviewRequests,
+          reviews
+        })}`
+      )
     }
   } catch (error) {
     core.setFailed(error.message)
@@ -78,3 +153,9 @@ async function run(): Promise<void> {
 }
 
 run()
+
+// CHANGES_REQUESTED
+//   reviews(CHANGES_REQUESTED).filter(hasNoReviewRequests) > 0 : changeRequested : waitingReview
+
+// APPROVED
+//   reviewRequests.length > O ? waitingReview : readyToMerge
