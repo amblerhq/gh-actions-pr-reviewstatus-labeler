@@ -59,7 +59,6 @@ function extractStoryIds(content) {
     const unique = [...new Set(all)];
     return unique;
 }
-//type Label = 'TO_REVIEW' | 'TO_CHANGE' | 'TO_MERGE' | 'TO_REBASE'
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -67,17 +66,11 @@ function run() {
             if (eventName === 'pull_request') {
                 const pushPayload = github.context
                     .payload;
-                const { number, title, body, head: { ref } } = pushPayload.pull_request;
+                const { number, title, body, state, draft, mergeable_state: mergeableState, requested_reviewers: requestedReviewers, head: { ref } } = pushPayload.pull_request;
                 const content = `${number} ${title} ${body} ${ref}`;
                 core.info(content);
                 core.info(extractStoryIds(content).join(','));
-                core.info('Fetching PR reviewDecision');
-                const { data: { draft, mergeable, state } } = yield octokit.pulls.get({ owner, repo, pull_number: number });
-                const { data: reviewRequests } = yield octokit.pulls.listRequestedReviewers({
-                    owner,
-                    repo,
-                    pull_number: number
-                });
+                core.info('Fetching PR');
                 const { data: reviews } = yield octokit.pulls.listReviews({
                     owner,
                     repo,
@@ -132,32 +125,34 @@ function run() {
                 //   }
                 // )
                 // core.info(`reviewDecision: ${reviewDecision}`)
-                // const validLabels: Label[] = (() => {
-                //   if (isDraft || state !== 'OPEN') {
-                //     return []
-                //   }
-                //   const labels: Label[] = []
-                //   if (mergeable === 'CONFLICTING') {
-                //     labels.push('TO_REBASE')
-                //   }
-                //   if (reviewDecision === 'REVIEW_REQUIRED') {
-                //     if (reviewRequests.length > O) {
-                //       labels.push('TO_REVIEW')
-                //     }
-                //   } else if (reviewDecision === 'CHANGES_REQUESTED') {
-                //     if (existingReviews.find(review => )
-                //   } else if (reviewDecision === 'APPROVED') {
-                //   }
-                //   return labels
-                // })()
-                //core.info(`validLabels : ${JSON.stringify(validLabels)}`)
                 core.info(`data : ${JSON.stringify({
                     draft,
-                    mergeable,
+                    mergeableState,
                     state,
-                    reviewRequests,
+                    requestedReviewers,
                     reviews
                 })}`);
+                const reviewLabel = (() => {
+                    if (draft || state !== 'open') {
+                        return null;
+                    }
+                    if (reviews.find(review => {
+                        return (review.state === 'CHANGE_REQUESTED' &&
+                            !requestedReviewers.find(({ login }) => { var _a; return login === ((_a = review.user) === null || _a === void 0 ? void 0 : _a.login); }));
+                    })) {
+                        return 'TO_CHANGE';
+                    }
+                    if (requestedReviewers.length > 0) {
+                        return 'TO_REVIEW';
+                    }
+                    if (reviews.find(review => review.state === 'APPROVED')) {
+                        return 'TO_MERGE';
+                    }
+                    return null;
+                })();
+                const mergeLabel = mergeableState === 'CONFLICTING' ? 'TO_REBASE' : null;
+                const labels = [reviewLabel, mergeLabel].filter(Boolean);
+                core.info(`labels : ${JSON.stringify(labels)}`);
             }
         }
         catch (error) {
@@ -166,10 +161,6 @@ function run() {
     });
 }
 run();
-// CHANGES_REQUESTED
-//   reviews(CHANGES_REQUESTED).filter(hasNoReviewRequests) > 0 : changeRequested : waitingReview
-// APPROVED
-//   reviewRequests.length > O ? waitingReview : readyToMerge
 
 
 /***/ }),

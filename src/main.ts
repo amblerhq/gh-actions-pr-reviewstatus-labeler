@@ -30,7 +30,7 @@ function extractStoryIds(content: string): string[] {
   return unique
 }
 
-//type Label = 'TO_REVIEW' | 'TO_CHANGE' | 'TO_MERGE' | 'TO_REBASE'
+type Label = 'TO_REVIEW' | 'TO_CHANGE' | 'TO_MERGE' | 'TO_REBASE'
 
 async function run(): Promise<void> {
   try {
@@ -43,6 +43,10 @@ async function run(): Promise<void> {
         number,
         title,
         body,
+        state,
+        draft,
+        mergeable_state: mergeableState,
+        requested_reviewers: requestedReviewers,
         head: {ref}
       } = pushPayload.pull_request
 
@@ -50,17 +54,7 @@ async function run(): Promise<void> {
       core.info(content)
       core.info(extractStoryIds(content).join(','))
 
-      core.info('Fetching PR reviewDecision')
-      const {
-        data: {draft, mergeable, state}
-      } = await octokit.pulls.get({owner, repo, pull_number: number})
-      const {data: reviewRequests} = await octokit.pulls.listRequestedReviewers(
-        {
-          owner,
-          repo,
-          pull_number: number
-        }
-      )
+      core.info('Fetching PR')
       const {data: reviews} = await octokit.pulls.listReviews({
         owner,
         repo,
@@ -117,35 +111,48 @@ async function run(): Promise<void> {
       // )
       // core.info(`reviewDecision: ${reviewDecision}`)
 
-      // const validLabels: Label[] = (() => {
-      //   if (isDraft || state !== 'OPEN') {
-      //     return []
-      //   }
-      //   const labels: Label[] = []
-      //   if (mergeable === 'CONFLICTING') {
-      //     labels.push('TO_REBASE')
-      //   }
-
-      //   if (reviewDecision === 'REVIEW_REQUIRED') {
-      //     if (reviewRequests.length > O) {
-      //       labels.push('TO_REVIEW')
-      //     }
-      //   } else if (reviewDecision === 'CHANGES_REQUESTED') {
-      //     if (existingReviews.find(review => )
-      //   } else if (reviewDecision === 'APPROVED') {
-      //   }
-      //   return labels
-      // })()
-      //core.info(`validLabels : ${JSON.stringify(validLabels)}`)
       core.info(
         `data : ${JSON.stringify({
           draft,
-          mergeable,
+          mergeableState,
           state,
-          reviewRequests,
+          requestedReviewers,
           reviews
         })}`
       )
+      const reviewLabel = ((): Label | null => {
+        if (draft || state !== 'open') {
+          return null
+        }
+
+        if (
+          reviews.find(review => {
+            return (
+              review.state === 'CHANGE_REQUESTED' &&
+              !requestedReviewers.find(
+                ({login}) => login === review.user?.login
+              )
+            )
+          })
+        ) {
+          return 'TO_CHANGE'
+        }
+
+        if (requestedReviewers.length > 0) {
+          return 'TO_REVIEW'
+        }
+
+        if (reviews.find(review => review.state === 'APPROVED')) {
+          return 'TO_MERGE'
+        }
+        return null
+      })()
+
+      const mergeLabel = mergeableState === 'CONFLICTING' ? 'TO_REBASE' : null
+
+      const labels = [reviewLabel, mergeLabel].filter(Boolean)
+
+      core.info(`labels : ${JSON.stringify(labels)}`)
     }
   } catch (error) {
     core.setFailed(error.message)
@@ -153,9 +160,3 @@ async function run(): Promise<void> {
 }
 
 run()
-
-// CHANGES_REQUESTED
-//   reviews(CHANGES_REQUESTED).filter(hasNoReviewRequests) > 0 : changeRequested : waitingReview
-
-// APPROVED
-//   reviewRequests.length > O ? waitingReview : readyToMerge
