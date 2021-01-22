@@ -8,7 +8,8 @@ on: # rebuild any PRs and main branch changes
         reopened,
         ready_for_review,
         review_requested,
-        review_request_removed
+        review_request_removed,
+        closed
       ]
   pull_request_review:
   #push:
