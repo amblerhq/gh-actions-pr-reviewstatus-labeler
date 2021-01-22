@@ -4,11 +4,12 @@ on: # rebuild any PRs and main branch changes
     types:
       [
         opened,
+        edited,
         synchronize,
         reopened,
         ready_for_review,
         review_requested,
-        review_request_removed,
+        review_request_removed
       ]
   pull_request_review:
   #push:
