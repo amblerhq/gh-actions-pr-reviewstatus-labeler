@@ -128,7 +128,7 @@ async function run(): Promise<void> {
         if (
           reviews.find(review => {
             return (
-              review.state === 'CHANGE_REQUESTED' &&
+              review.state === 'CHANGES_REQUESTED' &&
               !requestedReviewers.find(
                 ({login}) => login === review.user?.login
               )

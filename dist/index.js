@@ -137,7 +137,7 @@ function run() {
                         return null;
                     }
                     if (reviews.find(review => {
-                        return (review.state === 'CHANGE_REQUESTED' &&
+                        return (review.state === 'CHANGES_REQUESTED' &&
                             !requestedReviewers.find(({ login }) => { var _a; return login === ((_a = review.user) === null || _a === void 0 ? void 0 : _a.login); }));
                     })) {
                         return 'TO_CHANGE';
