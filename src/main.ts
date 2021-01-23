@@ -44,19 +44,22 @@ const defaultLabelMap: Record<PRStatus, Label | null> = {
 
 async function addLabels(prNumber: number, labels: Label[]): Promise<void> {
   //* Create label if needed
+  const {data: existingLabels} = await octokit.issues.listLabelsForRepo({
+    owner,
+    repo
+  })
   for (const label of labels) {
-    const remoteLabel = await octokit.issues.getLabel({
-      owner,
-      repo,
-      name: label.name
-    })
+    const remoteLabel = existingLabels.find(
+      label_ => label.name === label_.name
+    )
     if (!remoteLabel) {
-      await octokit.issues.createLabel({
+      const response = await octokit.issues.createLabel({
         owner,
         repo,
         name: label.name,
         color: label.color
       })
+      core.info(JSON.stringify(response))
     }
   }
 

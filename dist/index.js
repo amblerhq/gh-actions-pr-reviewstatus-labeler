@@ -70,19 +70,20 @@ const defaultLabelMap = {
 function addLabels(prNumber, labels) {
     return __awaiter(this, void 0, void 0, function* () {
         //* Create label if needed
+        const { data: existingLabels } = yield octokit.issues.listLabelsForRepo({
+            owner,
+            repo
+        });
         for (const label of labels) {
-            const remoteLabel = yield octokit.issues.getLabel({
-                owner,
-                repo,
-                name: label.name
-            });
+            const remoteLabel = existingLabels.find(label_ => label.name === label_.name);
             if (!remoteLabel) {
-                yield octokit.issues.createLabel({
+                const response = yield octokit.issues.createLabel({
                     owner,
                     repo,
                     name: label.name,
                     color: label.color
                 });
+                core.info(JSON.stringify(response));
             }
         }
         yield octokit.issues.addLabels({
