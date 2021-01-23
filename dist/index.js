@@ -61,10 +61,10 @@ function extractStoryIds(content) {
     return unique;
 }
 const defaultLabelMap = {
-    TO_REVIEW: { name: '🚦status:to-review', color: '#FBCA04' },
-    TO_CHANGE: { name: '🚦status:to-change', color: '#C2E0C6' },
-    TO_MERGE: { name: '🚦status:to-merge', color: '#0E8A16' },
-    TO_REBASE: { name: '🚦status:to-rebase', color: '#FBCA04' },
+    TO_REVIEW: { name: '🚦status:to-review', color: 'FBCA04' },
+    TO_CHANGE: { name: '🚦status:to-change', color: 'C2E0C6' },
+    TO_MERGE: { name: '🚦status:to-merge', color: '0E8A16' },
+    TO_REBASE: { name: '🚦status:to-rebase', color: 'FBCA04' },
     OTHER: null
 };
 function addLabels(prNumber, labels) {
