@@ -179,29 +179,32 @@ async function run(): Promise<void> {
     core.info(`Computed statuses : ${computedStatuses.join(',')}`)
 
     const labelMap = defaultLabelMap
+    const computedLabels = computedStatuses
+      .map(status => labelMap[status])
+      .filter(Boolean)
 
     const toAddLabels: Label[] = []
-    for (const status of computedStatuses) {
-      const mappedLabel = labelMap[status]
-      if (!mappedLabel) {
+    for (const computedLabel of computedLabels) {
+      if (!computedLabel) {
         continue
       }
-      if (!currentLabels.find(label_ => label_.name === mappedLabel.name)) {
-        toAddLabels.push(mappedLabel)
+      if (!currentLabels.find(label_ => label_.name === computedLabel.name)) {
+        toAddLabels.push(computedLabel)
       }
     }
 
+    core.info(
+      `Current labels : ${
+        currentLabels.map(label => label.name).join(',') || 'none'
+      }`
+    )
     const toRemoveLabels: Label[] = []
-    core.info(`Current labels : ${currentLabels.join(',') || 'none'}`)
-    for (const currentLabel of currentLabels) {
-      if (!currentLabel.name) {
-        continue
-      }
-      const mappedLabels = Object.values(labelMap)
-      if (
-        mappedLabels.find(label_ => label_?.name === currentLabel.name) &&
-        !currentLabels.find(label_ => label_.name === currentLabel.name)
-      ) {
+    const mappedLabels = Object.values(labelMap)
+    const currentSyncedLabels = currentLabels.filter(currentLabel =>
+      mappedLabels.find(mappedLabel => mappedLabel?.name === currentLabel.name)
+    )
+    for (const currentLabel of currentSyncedLabels) {
+      if (!computedLabels.find(label_ => label_?.name === currentLabel.name)) {
         toRemoveLabels.push(currentLabel as Label) // name property is optional
       }
     }
