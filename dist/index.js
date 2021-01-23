@@ -38,10 +38,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(186));
 const github = __importStar(__nccwpck_require__(438));
-if (!process.env.GITHUB_TOKEN) {
+const token = core.getInput('GITHUB_TOKEN', { required: true });
+if (!token) {
+    core.setFailed('Missing GITHUB_TOKEN');
     process.exit(1);
 }
-const octokit = github.getOctokit(process.env.GITHUB_TOKEN);
+const octokit = github.getOctokit(token);
 const { owner, repo } = github.context.repo;
 // const Clubhouse = require('clubhouse-lib');
 // const clubhouseToken = process.env.INPUT_CLUBHOUSETOKEN;
