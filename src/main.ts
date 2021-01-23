@@ -1,15 +1,13 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import * as Webhooks from '@octokit/webhooks'
-import {Octokit} from '@octokit/action'
 
-const octokit = new Octokit()
-
-if (!process.env.GITHUB_REPOSITORY) {
+if (!process.env.GITHUB_TOKEN) {
   process.exit(1)
 }
+const octokit = github.getOctokit(process.env.GITHUB_TOKEN)
 
-const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/')
+const {owner, repo} = github.context.repo
 
 // const Clubhouse = require('clubhouse-lib');
 
@@ -30,7 +28,55 @@ function extractStoryIds(content: string): string[] {
   return unique
 }
 
-type Label = 'TO_REVIEW' | 'TO_CHANGE' | 'TO_MERGE' | 'TO_REBASE'
+type PRStatus = 'TO_REVIEW' | 'TO_CHANGE' | 'TO_MERGE' | 'TO_REBASE' | 'OTHER'
+type Label = {name: string; color?: string}
+
+const defaultLabelMap: Record<PRStatus, Label | null> = {
+  TO_REVIEW: {name: '🚦status:to-review', color: '#FBCA04'},
+  TO_CHANGE: {name: '🚦status:to-change', color: '#C2E0C6'},
+  TO_MERGE: {name: '🚦status:to-merge', color: '#0E8A16'},
+  TO_REBASE: {name: '🚦status:to-rebase', color: '#FBCA04'},
+  OTHER: null
+}
+
+async function addLabels(prNumber: number, labels: Label[]): Promise<void> {
+  //* Create label if needed
+  for (const label of labels) {
+    const remoteLabel = await octokit.issues.getLabel({
+      owner,
+      repo,
+      name: label.name
+    })
+    if (!remoteLabel) {
+      await octokit.issues.createLabel({
+        owner,
+        repo,
+        name: label.name,
+        color: label.color
+      })
+    }
+  }
+
+  await octokit.issues.addLabels({
+    owner,
+    repo,
+    issue_number: prNumber,
+    labels: labels.map(label => label.name)
+  })
+}
+
+async function removeLabels(prNumber: number, labels: Label[]): Promise<void> {
+  await Promise.all(
+    labels.map(async label =>
+      octokit.issues.removeLabel({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        issue_number: prNumber,
+        name: label.name
+      })
+    )
+  )
+}
 
 async function run(): Promise<void> {
   try {
@@ -47,6 +93,7 @@ async function run(): Promise<void> {
         draft,
         mergeable_state: mergeableState,
         requested_reviewers: requestedReviewers,
+        labels: currentLabels,
         head: {ref}
       } = pushPayload.pull_request
 
@@ -61,56 +108,6 @@ async function run(): Promise<void> {
         pull_number: number
       })
 
-      // const {
-      //   repository: {
-      //     pullRequest: {
-      //       reviewDecision,
-      //       state,
-      //       isDraft,
-      //       mergeable,
-      //       reviewRequests: {nodes: requestedReviewers},
-      //       reviews: {nodes: existingReviews}
-      //     }
-      //   }
-      // } = await octokit.graphql(
-      //   `
-      //   query getReviewDecision($owner: String!, $repo: String!, $number: Int!) {
-      //     repository(owner: $owner, name: $repo) {
-      //       id
-      //       pullRequest(number: $number) {
-      //         state
-      //         isDraft
-      //         mergeable
-      //         reviewRequests(last: 50) {
-      //           nodes {
-      //             requestedReviewer {
-      //               ... on User {
-      //                 login
-      //               }
-      //             }
-      //           }
-      //         }
-      //         reviews(first: 100) {
-      //           nodes {
-      //             state
-      //             author {
-      //               login
-      //             }
-      //           }
-      //         }
-      //         reviewDecision
-      //       }
-      //     }
-      //   }
-      //   `,
-      //   {
-      //     owner,
-      //     repo,
-      //     number
-      //   }
-      // )
-      // core.info(`reviewDecision: ${reviewDecision}`)
-
       core.info(
         `data : ${JSON.stringify({
           draft,
@@ -120,9 +117,9 @@ async function run(): Promise<void> {
           reviews
         })}`
       )
-      const reviewLabel = ((): Label | null => {
+      const reviewStatus: PRStatus = ((): PRStatus => {
         if (draft || state !== 'open') {
-          return null
+          return 'OTHER'
         }
 
         if (
@@ -145,14 +142,52 @@ async function run(): Promise<void> {
         if (reviews.find(review => review.state === 'APPROVED')) {
           return 'TO_MERGE'
         }
-        return null
+        return 'OTHER'
       })()
 
-      const mergeLabel = mergeableState === 'CONFLICTING' ? 'TO_REBASE' : null
+      const mergeStatus: PRStatus =
+        mergeableState === 'CONFLICTING' ? 'TO_REBASE' : 'OTHER'
 
-      const labels = [reviewLabel, mergeLabel].filter(Boolean)
+      const computedStatuses: PRStatus[] = [reviewStatus, mergeStatus].filter(
+        status => status !== 'OTHER'
+      )
+      core.info(`Computed statuses : ${computedStatuses.join(',')}`)
 
-      core.info(`labels : ${JSON.stringify(labels)}`)
+      const labelMap = defaultLabelMap
+
+      const toAddLabels: Label[] = []
+      for (const status of computedStatuses) {
+        const mappedLabel = labelMap[status]
+        if (!mappedLabel) {
+          continue
+        }
+        if (!currentLabels.find(label_ => label_.name === mappedLabel.name)) {
+          toAddLabels.push(mappedLabel)
+        }
+      }
+
+      const toRemoveLabels: Label[] = []
+      for (const currentLabel of currentLabels) {
+        const mappedLabels = Object.values(labelMap)
+        if (
+          mappedLabels.find(label_ => label_?.name === currentLabel.name) &&
+          !currentLabels.find(label_ => label_.name === currentLabel.name)
+        ) {
+          toRemoveLabels.push(currentLabel)
+        }
+      }
+      core.info(
+        `Adding labels : ${toAddLabels.map(label => label.name).join(',')}`
+      )
+      if (toAddLabels.length > 0) {
+        await addLabels(number, toAddLabels)
+      }
+      core.info(
+        `Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`
+      )
+      if (toRemoveLabels.length > 0) {
+        await removeLabels(number, toRemoveLabels)
+      }
     }
   } catch (error) {
     core.setFailed(error.message)
