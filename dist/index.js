@@ -132,7 +132,7 @@ function run() {
             });
             const uniqueByUserReviews = [];
             for (const review of reviews.reverse()) {
-                if (!uniqueByUserReviews.find(uniqueReview => { var _a, _b; return ((_a = uniqueReview.user) === null || _a === void 0 ? void 0 : _a.login) === ((_b = review.user) === null || _b === void 0 ? void 0 : _b.login); })) {
+                if (!uniqueByUserReviews.find(uniqueReview => { var _a; return review.user && ((_a = uniqueReview.user) === null || _a === void 0 ? void 0 : _a.login) === review.user.login; })) {
                     uniqueByUserReviews.push(review);
                 }
             }

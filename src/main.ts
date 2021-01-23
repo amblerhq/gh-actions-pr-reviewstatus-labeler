@@ -126,7 +126,8 @@ async function run(): Promise<void> {
     for (const review of reviews.reverse()) {
       if (
         !uniqueByUserReviews.find(
-          uniqueReview => uniqueReview.user?.login === review.user?.login
+          uniqueReview =>
+            review.user && uniqueReview.user?.login === review.user.login
         )
       ) {
         uniqueByUserReviews.push(review)
