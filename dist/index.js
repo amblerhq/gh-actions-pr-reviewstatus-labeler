@@ -124,12 +124,18 @@ function run() {
             const content = `${number} ${title} ${body} ${ref}`;
             core.info(content);
             core.info(extractStoryIds(content).join(','));
-            core.info('Fetching PR');
+            core.info('Fetching PR reviews and requestedReviewers');
             const { data: reviews } = yield octokit.pulls.listReviews({
                 owner,
                 repo,
                 pull_number: number
             });
+            const uniqueByUserReviews = [];
+            for (const review of reviews.reverse()) {
+                if (!uniqueByUserReviews.find(uniqueReview => { var _a, _b; return ((_a = uniqueReview.user) === null || _a === void 0 ? void 0 : _a.login) === ((_b = review.user) === null || _b === void 0 ? void 0 : _b.login); })) {
+                    uniqueByUserReviews.push(review);
+                }
+            }
             const { data: requestedReviewers } = yield octokit.pulls.listRequestedReviewers({
                 owner,
                 repo,
@@ -140,13 +146,14 @@ function run() {
                 mergeableState,
                 state,
                 requestedReviewers,
-                reviews
+                reviews,
+                uniqueByUserReviews
             })}`);
             const reviewStatus = (() => {
                 if (draft || state !== 'open') {
                     return 'OTHER';
                 }
-                if (reviews.find(review => {
+                if (uniqueByUserReviews.find(review => {
                     return (review.state === 'CHANGES_REQUESTED' &&
                         !requestedReviewers.users.find(({ login }) => { var _a; return login === ((_a = review.user) === null || _a === void 0 ? void 0 : _a.login); }));
                 })) {
@@ -156,7 +163,7 @@ function run() {
                     requestedReviewers.teams.length > 0) {
                     return 'TO_REVIEW';
                 }
-                if (reviews.find(review => review.state === 'APPROVED')) {
+                if (uniqueByUserReviews.find(review => review.state === 'APPROVED')) {
                     return 'TO_MERGE';
                 }
                 return 'OTHER';

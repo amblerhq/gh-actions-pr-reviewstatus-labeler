@@ -116,12 +116,23 @@ async function run(): Promise<void> {
     core.info(content)
     core.info(extractStoryIds(content).join(','))
 
-    core.info('Fetching PR')
+    core.info('Fetching PR reviews and requestedReviewers')
     const {data: reviews} = await octokit.pulls.listReviews({
       owner,
       repo,
       pull_number: number
     })
+    const uniqueByUserReviews: typeof reviews = []
+    for (const review of reviews.reverse()) {
+      if (
+        !uniqueByUserReviews.find(
+          uniqueReview => uniqueReview.user?.login === review.user?.login
+        )
+      ) {
+        uniqueByUserReviews.push(review)
+      }
+    }
+
     const {
       data: requestedReviewers
     } = await octokit.pulls.listRequestedReviewers({
@@ -136,7 +147,8 @@ async function run(): Promise<void> {
         mergeableState,
         state,
         requestedReviewers,
-        reviews
+        reviews,
+        uniqueByUserReviews
       })}`
     )
     const reviewStatus: PRStatus = ((): PRStatus => {
@@ -145,7 +157,7 @@ async function run(): Promise<void> {
       }
 
       if (
-        reviews.find(review => {
+        uniqueByUserReviews.find(review => {
           return (
             review.state === 'CHANGES_REQUESTED' &&
             !requestedReviewers.users.find(
@@ -164,7 +176,7 @@ async function run(): Promise<void> {
         return 'TO_REVIEW'
       }
 
-      if (reviews.find(review => review.state === 'APPROVED')) {
+      if (uniqueByUserReviews.find(review => review.state === 'APPROVED')) {
         return 'TO_MERGE'
       }
       return 'OTHER'
