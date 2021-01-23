@@ -109,75 +109,90 @@ function removeLabels(prNumber, labels) {
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { eventName } = github.context;
-            if (eventName === 'pull_request') {
-                const pushPayload = github.context
-                    .payload;
-                const { number, title, body, state, draft, mergeable_state: mergeableState, requested_reviewers: requestedReviewers, labels: currentLabels, head: { ref } } = pushPayload.pull_request;
-                const content = `${number} ${title} ${body} ${ref}`;
-                core.info(content);
-                core.info(extractStoryIds(content).join(','));
-                core.info('Fetching PR');
-                const { data: reviews } = yield octokit.pulls.listReviews({
-                    owner,
-                    repo,
-                    pull_number: number
-                });
-                core.info(`data : ${JSON.stringify({
-                    draft,
-                    mergeableState,
-                    state,
-                    requestedReviewers,
-                    reviews
-                })}`);
-                const reviewStatus = (() => {
-                    if (draft || state !== 'open') {
-                        return 'OTHER';
-                    }
-                    if (reviews.find(review => {
-                        return (review.state === 'CHANGES_REQUESTED' &&
-                            !requestedReviewers.find(({ login }) => { var _a; return login === ((_a = review.user) === null || _a === void 0 ? void 0 : _a.login); }));
-                    })) {
-                        return 'TO_CHANGE';
-                    }
-                    if (requestedReviewers.length > 0) {
-                        return 'TO_REVIEW';
-                    }
-                    if (reviews.find(review => review.state === 'APPROVED')) {
-                        return 'TO_MERGE';
-                    }
+            const { payload: { pull_request } } = github.context;
+            if (!pull_request) {
+                return;
+            }
+            const pullRequestNumber = pull_request.number;
+            //* We can't use the event payload because some fields are missing for the pull_request_review event
+            const { data: pullRequest } = yield octokit.pulls.get({
+                owner,
+                repo,
+                pull_number: pullRequestNumber
+            });
+            const { number, title, body, state, draft, mergeable_state: mergeableState, labels: currentLabels, head: { ref } } = pullRequest;
+            const content = `${number} ${title} ${body} ${ref}`;
+            core.info(content);
+            core.info(extractStoryIds(content).join(','));
+            core.info('Fetching PR');
+            const { data: reviews } = yield octokit.pulls.listReviews({
+                owner,
+                repo,
+                pull_number: number
+            });
+            const { data: requestedReviewers } = yield octokit.pulls.listRequestedReviewers({
+                owner,
+                repo,
+                pull_number: number
+            });
+            core.info(`data : ${JSON.stringify({
+                draft,
+                mergeableState,
+                state,
+                requestedReviewers,
+                reviews
+            })}`);
+            const reviewStatus = (() => {
+                if (draft || state !== 'open') {
                     return 'OTHER';
-                })();
-                const mergeStatus = mergeableState === 'CONFLICTING' ? 'TO_REBASE' : 'OTHER';
-                const computedStatuses = [reviewStatus, mergeStatus].filter(status => status !== 'OTHER');
-                core.info(`Computed statuses : ${computedStatuses.join(',')}`);
-                const labelMap = defaultLabelMap;
-                const toAddLabels = [];
-                for (const status of computedStatuses) {
-                    const mappedLabel = labelMap[status];
-                    if (!mappedLabel) {
-                        continue;
-                    }
-                    if (!currentLabels.find(label_ => label_.name === mappedLabel.name)) {
-                        toAddLabels.push(mappedLabel);
-                    }
                 }
-                const toRemoveLabels = [];
-                for (const currentLabel of currentLabels) {
-                    const mappedLabels = Object.values(labelMap);
-                    if (mappedLabels.find(label_ => (label_ === null || label_ === void 0 ? void 0 : label_.name) === currentLabel.name) &&
-                        !currentLabels.find(label_ => label_.name === currentLabel.name)) {
-                        toRemoveLabels.push(currentLabel);
-                    }
+                if (reviews.find(review => {
+                    return (review.state === 'CHANGES_REQUESTED' &&
+                        !requestedReviewers.users.find(({ login }) => { var _a; return login === ((_a = review.user) === null || _a === void 0 ? void 0 : _a.login); }));
+                })) {
+                    return 'TO_CHANGE';
                 }
-                core.info(`Adding labels : ${toAddLabels.map(label => label.name).join(',')}`);
-                if (toAddLabels.length > 0) {
-                    yield addLabels(number, toAddLabels);
+                if (requestedReviewers.users.length > 0 ||
+                    requestedReviewers.teams.length > 0) {
+                    return 'TO_REVIEW';
                 }
-                core.info(`Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`);
-                if (toRemoveLabels.length > 0) {
-                    yield removeLabels(number, toRemoveLabels);
+                if (reviews.find(review => review.state === 'APPROVED')) {
+                    return 'TO_MERGE';
                 }
+                return 'OTHER';
+            })();
+            const mergeStatus = mergeableState === 'CONFLICTING' ? 'TO_REBASE' : 'OTHER';
+            const computedStatuses = [reviewStatus, mergeStatus].filter(status => status !== 'OTHER');
+            core.info(`Computed statuses : ${computedStatuses.join(',')}`);
+            const labelMap = defaultLabelMap;
+            const toAddLabels = [];
+            for (const status of computedStatuses) {
+                const mappedLabel = labelMap[status];
+                if (!mappedLabel) {
+                    continue;
+                }
+                if (!currentLabels.find(label_ => label_.name === mappedLabel.name)) {
+                    toAddLabels.push(mappedLabel);
+                }
+            }
+            const toRemoveLabels = [];
+            for (const currentLabel of currentLabels) {
+                if (!currentLabel.name) {
+                    continue;
+                }
+                const mappedLabels = Object.values(labelMap);
+                if (mappedLabels.find(label_ => (label_ === null || label_ === void 0 ? void 0 : label_.name) === currentLabel.name) &&
+                    !currentLabels.find(label_ => label_.name === currentLabel.name)) {
+                    toRemoveLabels.push(currentLabel); // name property is optional
+                }
+            }
+            core.info(`Adding labels : ${toAddLabels.map(label => label.name).join(',')}`);
+            if (toAddLabels.length > 0) {
+                yield addLabels(number, toAddLabels);
+            }
+            core.info(`Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`);
+            if (toRemoveLabels.length > 0) {
+                yield removeLabels(number, toRemoveLabels);
             }
         }
         catch (error) {

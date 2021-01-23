@@ -1,6 +1,5 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import * as Webhooks from '@octokit/webhooks'
 
 const token = core.getInput('GITHUB_TOKEN', {required: true})
 
@@ -86,114 +85,136 @@ async function removeLabels(prNumber: number, labels: Label[]): Promise<void> {
 
 async function run(): Promise<void> {
   try {
-    const {eventName} = github.context
+    const {
+      payload: {pull_request}
+    } = github.context
 
-    if (eventName === 'pull_request') {
-      const pushPayload = github.context
-        .payload as Webhooks.EventPayloads.WebhookPayloadPullRequest
-      const {
-        number,
-        title,
-        body,
-        state,
+    if (!pull_request) {
+      return
+    }
+
+    const pullRequestNumber = pull_request.number
+    //* We can't use the event payload because some fields are missing for the pull_request_review event
+    const {data: pullRequest} = await octokit.pulls.get({
+      owner,
+      repo,
+      pull_number: pullRequestNumber
+    })
+
+    const {
+      number,
+      title,
+      body,
+      state,
+      draft,
+      mergeable_state: mergeableState,
+      labels: currentLabels,
+      head: {ref}
+    } = pullRequest
+
+    const content = `${number} ${title} ${body} ${ref}`
+    core.info(content)
+    core.info(extractStoryIds(content).join(','))
+
+    core.info('Fetching PR')
+    const {data: reviews} = await octokit.pulls.listReviews({
+      owner,
+      repo,
+      pull_number: number
+    })
+    const {
+      data: requestedReviewers
+    } = await octokit.pulls.listRequestedReviewers({
+      owner,
+      repo,
+      pull_number: number
+    })
+
+    core.info(
+      `data : ${JSON.stringify({
         draft,
-        mergeable_state: mergeableState,
-        requested_reviewers: requestedReviewers,
-        labels: currentLabels,
-        head: {ref}
-      } = pushPayload.pull_request
-
-      const content = `${number} ${title} ${body} ${ref}`
-      core.info(content)
-      core.info(extractStoryIds(content).join(','))
-
-      core.info('Fetching PR')
-      const {data: reviews} = await octokit.pulls.listReviews({
-        owner,
-        repo,
-        pull_number: number
-      })
-
-      core.info(
-        `data : ${JSON.stringify({
-          draft,
-          mergeableState,
-          state,
-          requestedReviewers,
-          reviews
-        })}`
-      )
-      const reviewStatus: PRStatus = ((): PRStatus => {
-        if (draft || state !== 'open') {
-          return 'OTHER'
-        }
-
-        if (
-          reviews.find(review => {
-            return (
-              review.state === 'CHANGES_REQUESTED' &&
-              !requestedReviewers.find(
-                ({login}) => login === review.user?.login
-              )
-            )
-          })
-        ) {
-          return 'TO_CHANGE'
-        }
-
-        if (requestedReviewers.length > 0) {
-          return 'TO_REVIEW'
-        }
-
-        if (reviews.find(review => review.state === 'APPROVED')) {
-          return 'TO_MERGE'
-        }
+        mergeableState,
+        state,
+        requestedReviewers,
+        reviews
+      })}`
+    )
+    const reviewStatus: PRStatus = ((): PRStatus => {
+      if (draft || state !== 'open') {
         return 'OTHER'
-      })()
-
-      const mergeStatus: PRStatus =
-        mergeableState === 'CONFLICTING' ? 'TO_REBASE' : 'OTHER'
-
-      const computedStatuses: PRStatus[] = [reviewStatus, mergeStatus].filter(
-        status => status !== 'OTHER'
-      )
-      core.info(`Computed statuses : ${computedStatuses.join(',')}`)
-
-      const labelMap = defaultLabelMap
-
-      const toAddLabels: Label[] = []
-      for (const status of computedStatuses) {
-        const mappedLabel = labelMap[status]
-        if (!mappedLabel) {
-          continue
-        }
-        if (!currentLabels.find(label_ => label_.name === mappedLabel.name)) {
-          toAddLabels.push(mappedLabel)
-        }
       }
 
-      const toRemoveLabels: Label[] = []
-      for (const currentLabel of currentLabels) {
-        const mappedLabels = Object.values(labelMap)
-        if (
-          mappedLabels.find(label_ => label_?.name === currentLabel.name) &&
-          !currentLabels.find(label_ => label_.name === currentLabel.name)
-        ) {
-          toRemoveLabels.push(currentLabel)
-        }
+      if (
+        reviews.find(review => {
+          return (
+            review.state === 'CHANGES_REQUESTED' &&
+            !requestedReviewers.users.find(
+              ({login}) => login === review.user?.login
+            )
+          )
+        })
+      ) {
+        return 'TO_CHANGE'
       }
-      core.info(
-        `Adding labels : ${toAddLabels.map(label => label.name).join(',')}`
-      )
-      if (toAddLabels.length > 0) {
-        await addLabels(number, toAddLabels)
+
+      if (
+        requestedReviewers.users.length > 0 ||
+        requestedReviewers.teams.length > 0
+      ) {
+        return 'TO_REVIEW'
       }
-      core.info(
-        `Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`
-      )
-      if (toRemoveLabels.length > 0) {
-        await removeLabels(number, toRemoveLabels)
+
+      if (reviews.find(review => review.state === 'APPROVED')) {
+        return 'TO_MERGE'
       }
+      return 'OTHER'
+    })()
+
+    const mergeStatus: PRStatus =
+      mergeableState === 'CONFLICTING' ? 'TO_REBASE' : 'OTHER'
+
+    const computedStatuses: PRStatus[] = [reviewStatus, mergeStatus].filter(
+      status => status !== 'OTHER'
+    )
+    core.info(`Computed statuses : ${computedStatuses.join(',')}`)
+
+    const labelMap = defaultLabelMap
+
+    const toAddLabels: Label[] = []
+    for (const status of computedStatuses) {
+      const mappedLabel = labelMap[status]
+      if (!mappedLabel) {
+        continue
+      }
+      if (!currentLabels.find(label_ => label_.name === mappedLabel.name)) {
+        toAddLabels.push(mappedLabel)
+      }
+    }
+
+    const toRemoveLabels: Label[] = []
+    for (const currentLabel of currentLabels) {
+      if (!currentLabel.name) {
+        continue
+      }
+      const mappedLabels = Object.values(labelMap)
+      if (
+        mappedLabels.find(label_ => label_?.name === currentLabel.name) &&
+        !currentLabels.find(label_ => label_.name === currentLabel.name)
+      ) {
+        toRemoveLabels.push(currentLabel as Label) // name property is optional
+      }
+    }
+    core.info(
+      `Adding labels : ${toAddLabels.map(label => label.name).join(',')}`
+    )
+    if (toAddLabels.length > 0) {
+      await addLabels(number, toAddLabels)
+    }
+    core.info(
+      `Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`
+    )
+    if (toRemoveLabels.length > 0) {
+      await removeLabels(number, toRemoveLabels)
     }
   } catch (error) {
     core.setFailed(error.message)
