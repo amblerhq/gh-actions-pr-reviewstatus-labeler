@@ -192,6 +192,7 @@ async function run(): Promise<void> {
     }
 
     const toRemoveLabels: Label[] = []
+    core.info(`Current labels : ${currentLabels.join(',') || 'none'}`)
     for (const currentLabel of currentLabels) {
       if (!currentLabel.name) {
         continue
@@ -204,16 +205,18 @@ async function run(): Promise<void> {
         toRemoveLabels.push(currentLabel as Label) // name property is optional
       }
     }
-    core.info(
-      `Adding labels : ${toAddLabels.map(label => label.name).join(',')}`
-    )
+
     if (toAddLabels.length > 0) {
+      core.info(
+        `Adding labels : ${toAddLabels.map(label => label.name).join(',')}`
+      )
       await addLabels(number, toAddLabels)
     }
-    core.info(
-      `Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`
-    )
+
     if (toRemoveLabels.length > 0) {
+      core.info(
+        `Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`
+      )
       await removeLabels(number, toRemoveLabels)
     }
   } catch (error) {

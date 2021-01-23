@@ -176,6 +176,7 @@ function run() {
                 }
             }
             const toRemoveLabels = [];
+            core.info(`Current labels : ${currentLabels.join(',') || 'none'}`);
             for (const currentLabel of currentLabels) {
                 if (!currentLabel.name) {
                     continue;
@@ -186,12 +187,12 @@ function run() {
                     toRemoveLabels.push(currentLabel); // name property is optional
                 }
             }
-            core.info(`Adding labels : ${toAddLabels.map(label => label.name).join(',')}`);
             if (toAddLabels.length > 0) {
+                core.info(`Adding labels : ${toAddLabels.map(label => label.name).join(',')}`);
                 yield addLabels(number, toAddLabels);
             }
-            core.info(`Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`);
             if (toRemoveLabels.length > 0) {
+                core.info(`Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`);
                 yield removeLabels(number, toRemoveLabels);
             }
         }
