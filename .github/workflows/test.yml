@@ -12,6 +12,8 @@ on: # rebuild any PRs and main branch changes
         closed
       ]
   pull_request_review:
+    branches:
+      - master
 
 jobs:
   build:

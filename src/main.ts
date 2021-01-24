@@ -48,7 +48,10 @@ async function run(): Promise<void> {
     const labelMap = DEFAULT_LABEL_MAP //TODO permit to override
 
     core.info('Fetching PR')
-    const pullRequest: PullRequest = await getPullRequest()
+    const pullRequest = await getPullRequest()
+    if (!pullRequest) {
+      return
+    }
 
     const {number, labels: currentLabels} = pullRequest
 
@@ -89,13 +92,14 @@ async function run(): Promise<void> {
   }
 }
 
-async function getPullRequest(): Promise<PullRequest> {
+async function getPullRequest(): Promise<PullRequest | undefined> {
   const {
     payload: {pull_request}
   } = github.context
 
   if (!pull_request) {
-    throw new Error('Pull Request not found')
+    core.info('No pull request context. Skipping')
+    return undefined
   }
 
   const pullRequestNumber = pull_request.number

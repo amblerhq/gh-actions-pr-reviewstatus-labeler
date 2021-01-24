@@ -57,6 +57,9 @@ function run() {
             const labelMap = DEFAULT_LABEL_MAP; //TODO permit to override
             core.info('Fetching PR');
             const pullRequest = yield getPullRequest();
+            if (!pullRequest) {
+                return;
+            }
             const { number, labels: currentLabels } = pullRequest;
             core.info('Fetching PR reviews and requestedReviewers');
             const reviews = yield getUniqueReviews(number);
@@ -87,7 +90,8 @@ function getPullRequest() {
     return __awaiter(this, void 0, void 0, function* () {
         const { payload: { pull_request } } = github.context;
         if (!pull_request) {
-            throw new Error('Pull Request not found');
+            core.info('No pull request context. Skipping');
+            return undefined;
         }
         const pullRequestNumber = pull_request.number;
         //* We can't use the event payload because some fields are missing for the pull_request_review event
