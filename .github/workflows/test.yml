@@ -30,6 +30,8 @@ jobs:
   build: # make sure build/ci work properly
     needs: prevent_parallel_runs
     if: ${{ needs.prevent_parallel_runs.outputs.should_skip != 'true' }}
+    strategy:
+      max-parallel: 1
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
