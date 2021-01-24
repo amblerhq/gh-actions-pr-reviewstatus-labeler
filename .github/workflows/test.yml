@@ -25,7 +25,7 @@ jobs:
         uses: fkirc/skip-duplicate-actions@master
         with:
           skip_after_successful_duplicate: false
-          concurrent_skipping: same_content
+          concurrent_skipping: outdated_runs
 
   build: # make sure build/ci work properly
     needs: prevent_parallel_runs
