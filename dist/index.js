@@ -55,15 +55,14 @@ function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const labelMap = DEFAULT_LABEL_MAP; //TODO permit to override
+            core.info('Fetching PR');
             const pullRequest = yield getPullRequest();
-            const { number, state, draft, mergeable_state: mergeableState, labels: currentLabels } = pullRequest;
+            const { number, labels: currentLabels } = pullRequest;
             core.info('Fetching PR reviews and requestedReviewers');
             const reviews = yield getUniqueReviews(number);
             const requestedReviewers = yield getRequestReviewers(number);
             const computedLabels = getComputedLabels({
-                draft,
-                mergeableState,
-                state,
+                pullRequest,
                 reviews,
                 requestedReviewers,
                 labelMap
@@ -71,11 +70,11 @@ function run() {
             const toAddLabels = getLabelsToAdd(currentLabels, computedLabels);
             const toRemoveLabels = getLabelsToRemove(currentLabels, computedLabels, labelMap);
             if (toAddLabels.length > 0) {
-                core.info(`Adding labels : ${toAddLabels.map(label => label.name).join(',')}`);
+                core.info(`Adding labels: ${toAddLabels.map(label => label.name).join(',')}`);
                 yield addLabels(number, toAddLabels);
             }
             if (toRemoveLabels.length > 0) {
-                core.info(`Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`);
+                core.info(`Removing labels: ${toRemoveLabels.map(label => label.name).join(',')}`);
                 yield removeLabels(number, toRemoveLabels);
             }
         }
@@ -128,7 +127,8 @@ function getRequestReviewers(pullRequestNumber) {
         return requestedReviewers;
     });
 }
-function getComputedLabels({ reviews, requestedReviewers, draft, state, mergeableState, labelMap }) {
+function getComputedLabels({ reviews, requestedReviewers, pullRequest, labelMap }) {
+    const { state, draft, mergeable_state: mergeableState } = pullRequest;
     const reviewStatus = (() => {
         if (draft || state !== 'open') {
             return null;
@@ -139,8 +139,7 @@ function getComputedLabels({ reviews, requestedReviewers, draft, state, mergeabl
         })) {
             return 'TO_CHANGE';
         }
-        if (requestedReviewers.users.length > 0 ||
-            requestedReviewers.teams.length > 0) {
+        if (requestedReviewers.users.length > 0) {
             return 'TO_REVIEW';
         }
         if (reviews.find(review => review.state === 'APPROVED')) {
@@ -187,8 +186,11 @@ function addLabels(prNumber, labels) {
             repo
         });
         for (const label of labels) {
+            if (!label.name) {
+                continue;
+            }
             const remoteLabel = existingLabels.find(label_ => label.name === label_.name);
-            if (!remoteLabel) {
+            if (!remoteLabel && label.name) {
                 const response = yield octokit.issues.createLabel({
                     owner,
                     repo,
@@ -202,13 +204,16 @@ function addLabels(prNumber, labels) {
             owner,
             repo,
             issue_number: prNumber,
-            labels: labels.map(label => label.name)
+            labels: labels.map(label => label.name).filter(Boolean)
         });
     });
 }
 function removeLabels(prNumber, labels) {
     return __awaiter(this, void 0, void 0, function* () {
         yield Promise.all(labels.map((label) => __awaiter(this, void 0, void 0, function* () {
+            if (!label.name) {
+                return;
+            }
             return octokit.issues.removeLabel({
                 owner: github.context.repo.owner,
                 repo: github.context.repo.repo,
