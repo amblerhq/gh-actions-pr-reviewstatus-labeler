@@ -1,5 +1,27 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
+import {GetResponseDataTypeFromEndpointMethod} from '@octokit/types'
+
+type PullRequest = GetResponseDataTypeFromEndpointMethod<
+  typeof octokit.pulls.get
+>
+type Reviews = GetResponseDataTypeFromEndpointMethod<
+  typeof octokit.pulls.listReviews
+>
+type RequestedReviewers = GetResponseDataTypeFromEndpointMethod<
+  typeof octokit.pulls.listRequestedReviewers
+>
+type PRStatus = 'TO_REVIEW' | 'TO_CHANGE' | 'TO_MERGE' | 'TO_REBASE'
+type Label = {name: string; color?: string}
+
+const DEFAULT_LABEL_MAP: Record<PRStatus, Label> = {
+  TO_REVIEW: {name: '🚦status:to-review', color: 'FBCA04'},
+  TO_CHANGE: {name: '🚦status:to-change', color: 'C2E0C6'},
+  TO_MERGE: {name: '🚦status:to-merge', color: '0E8A16'},
+  TO_REBASE: {name: '🚦status:to-rebase', color: 'FBCA04'}
+}
+
+type LabelMap = typeof DEFAULT_LABEL_MAP
 
 const token = core.getInput('GITHUB_TOKEN', {required: true})
 
@@ -11,34 +33,205 @@ const octokit = github.getOctokit(token)
 
 const {owner, repo} = github.context.repo
 
-// const Clubhouse = require('clubhouse-lib');
+async function run(): Promise<void> {
+  try {
+    const labelMap = DEFAULT_LABEL_MAP //TODO permit to override
 
-// const clubhouseToken = process.env.INPUT_CLUBHOUSETOKEN;
-// const client = Clubhouse.create(clubhouseToken);
+    const pullRequest: PullRequest = await getPullRequest()
 
-/**
- * Finds all clubhouse story IDs in some string content.
- *
- * @param {string} content - content that may contain story IDs.
- * @return {Array} - Clubhouse story IDs 1-7 digit strings.
- */
+    const {
+      number,
+      state,
+      draft,
+      mergeable_state: mergeableState,
+      labels: currentLabels
+    } = pullRequest
 
-function extractStoryIds(content: string): string[] {
-  const regex = /(?<=ch)\d{1,7}/g
-  const all = content.match(regex)
-  const unique = [...new Set(all)]
-  return unique
+    core.info('Fetching PR reviews and requestedReviewers')
+    const reviews = await getUniqueReviews(number)
+    const requestedReviewers = await getRequestReviewers(number)
+
+    const computedLabels = getComputedLabels({
+      draft,
+      mergeableState,
+      state,
+      reviews,
+      requestedReviewers,
+      labelMap
+    })
+
+    const toAddLabels = getLabelsToAdd(currentLabels as Label[], computedLabels)
+
+    const toRemoveLabels = getLabelsToRemove(
+      currentLabels as Label[],
+      computedLabels,
+      labelMap
+    )
+
+    if (toAddLabels.length > 0) {
+      core.info(
+        `Adding labels : ${toAddLabels.map(label => label.name).join(',')}`
+      )
+      await addLabels(number, toAddLabels)
+    }
+
+    if (toRemoveLabels.length > 0) {
+      core.info(
+        `Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`
+      )
+      await removeLabels(number, toRemoveLabels)
+    }
+  } catch (error) {
+    core.setFailed(error.message)
+  }
 }
 
-type PRStatus = 'TO_REVIEW' | 'TO_CHANGE' | 'TO_MERGE' | 'TO_REBASE' | 'OTHER'
-type Label = {name: string; color?: string}
+async function getPullRequest(): Promise<PullRequest> {
+  const {
+    payload: {pull_request}
+  } = github.context
 
-const defaultLabelMap: Record<PRStatus, Label | null> = {
-  TO_REVIEW: {name: '🚦status:to-review', color: 'FBCA04'},
-  TO_CHANGE: {name: '🚦status:to-change', color: 'C2E0C6'},
-  TO_MERGE: {name: '🚦status:to-merge', color: '0E8A16'},
-  TO_REBASE: {name: '🚦status:to-rebase', color: 'FBCA04'},
-  OTHER: null
+  if (!pull_request) {
+    throw new Error('Pull Request not found')
+  }
+
+  const pullRequestNumber = pull_request.number
+  //* We can't use the event payload because some fields are missing for the pull_request_review event
+  const {data: pullRequest} = await octokit.pulls.get({
+    owner,
+    repo,
+    pull_number: pullRequestNumber
+  })
+
+  return pullRequest
+}
+
+async function getUniqueReviews(pullRequestNumber: number): Promise<Reviews> {
+  const {data: reviews} = await octokit.pulls.listReviews({
+    owner,
+    repo,
+    pull_number: pullRequestNumber
+  })
+  const uniqueByUserReviews: Reviews = []
+  for (const review of reviews.reverse()) {
+    if (
+      !uniqueByUserReviews.find(
+        uniqueReview =>
+          review.user && uniqueReview.user?.login === review.user.login
+      )
+    ) {
+      uniqueByUserReviews.push(review)
+    }
+  }
+  return uniqueByUserReviews
+}
+
+async function getRequestReviewers(
+  pullRequestNumber: number
+): Promise<RequestedReviewers> {
+  const {data: requestedReviewers} = await octokit.pulls.listRequestedReviewers(
+    {
+      owner,
+      repo,
+      pull_number: pullRequestNumber
+    }
+  )
+  return requestedReviewers
+}
+
+function getComputedLabels({
+  reviews,
+  requestedReviewers,
+  draft,
+  state,
+  mergeableState,
+  labelMap
+}: {
+  reviews: Reviews
+  requestedReviewers: RequestedReviewers
+  draft?: boolean
+  state: string
+  mergeableState: string
+  labelMap: LabelMap
+}): Label[] {
+  const reviewStatus = ((): PRStatus | null => {
+    if (draft || state !== 'open') {
+      return null
+    }
+
+    if (
+      reviews.find(review => {
+        return (
+          review.state === 'CHANGES_REQUESTED' &&
+          !requestedReviewers.users.find(
+            ({login}) => login === review.user?.login
+          )
+        )
+      })
+    ) {
+      return 'TO_CHANGE'
+    }
+
+    if (
+      requestedReviewers.users.length > 0 ||
+      requestedReviewers.teams.length > 0
+    ) {
+      return 'TO_REVIEW'
+    }
+
+    if (reviews.find(review => review.state === 'APPROVED')) {
+      return 'TO_MERGE'
+    }
+    return null
+  })()
+
+  const mergeStatus: PRStatus | null =
+    mergeableState === 'CONFLICTING' ? 'TO_REBASE' : null
+
+  const computedStatuses: PRStatus[] = [reviewStatus, mergeStatus].filter(
+    status => status !== null
+  ) as PRStatus[]
+  core.info(`Computed statuses : ${computedStatuses.join(',')}`)
+
+  const computedLabels = computedStatuses
+    .map(status => labelMap[status])
+    .filter(Boolean)
+
+  return computedLabels
+}
+
+function getLabelsToAdd(
+  currentLabels: Label[],
+  computedLabels: Label[]
+): Label[] {
+  const toAddLabels = []
+  for (const computedLabel of computedLabels) {
+    if (!computedLabel) {
+      continue
+    }
+    if (!currentLabels.find(label_ => label_.name === computedLabel.name)) {
+      toAddLabels.push(computedLabel)
+    }
+  }
+  return toAddLabels
+}
+
+function getLabelsToRemove(
+  currentLabels: Label[],
+  computedLabels: Label[],
+  labelMap: LabelMap
+): Label[] {
+  const toRemoveLabels: Label[] = []
+  const mappedLabels = Object.values(labelMap)
+  const currentSyncedLabels = currentLabels.filter(currentLabel =>
+    mappedLabels.find(mappedLabel => mappedLabel?.name === currentLabel.name)
+  )
+  for (const currentLabel of currentSyncedLabels) {
+    if (!computedLabels.find(label_ => label_?.name === currentLabel.name)) {
+      toRemoveLabels.push(currentLabel) // name property is optional
+    }
+  }
+  return toRemoveLabels
 }
 
 async function addLabels(prNumber: number, labels: Label[]): Promise<void> {
@@ -81,163 +274,6 @@ async function removeLabels(prNumber: number, labels: Label[]): Promise<void> {
       })
     )
   )
-}
-
-async function run(): Promise<void> {
-  try {
-    const {
-      payload: {pull_request}
-    } = github.context
-
-    if (!pull_request) {
-      return
-    }
-
-    const pullRequestNumber = pull_request.number
-    //* We can't use the event payload because some fields are missing for the pull_request_review event
-    const {data: pullRequest} = await octokit.pulls.get({
-      owner,
-      repo,
-      pull_number: pullRequestNumber
-    })
-
-    const {
-      number,
-      title,
-      body,
-      state,
-      draft,
-      mergeable_state: mergeableState,
-      labels: currentLabels,
-      head: {ref}
-    } = pullRequest
-
-    const content = `${number} ${title} ${body} ${ref}`
-    core.info(content)
-    core.info(extractStoryIds(content).join(','))
-
-    core.info('Fetching PR reviews and requestedReviewers')
-    const {data: reviews} = await octokit.pulls.listReviews({
-      owner,
-      repo,
-      pull_number: number
-    })
-    const uniqueByUserReviews: typeof reviews = []
-    for (const review of reviews.reverse()) {
-      if (
-        !uniqueByUserReviews.find(
-          uniqueReview =>
-            review.user && uniqueReview.user?.login === review.user.login
-        )
-      ) {
-        uniqueByUserReviews.push(review)
-      }
-    }
-
-    const {
-      data: requestedReviewers
-    } = await octokit.pulls.listRequestedReviewers({
-      owner,
-      repo,
-      pull_number: number
-    })
-
-    core.info(
-      `data : ${JSON.stringify({
-        draft,
-        mergeableState,
-        state,
-        requestedReviewers,
-        reviews,
-        uniqueByUserReviews
-      })}`
-    )
-    const reviewStatus: PRStatus = ((): PRStatus => {
-      if (draft || state !== 'open') {
-        return 'OTHER'
-      }
-
-      if (
-        uniqueByUserReviews.find(review => {
-          return (
-            review.state === 'CHANGES_REQUESTED' &&
-            !requestedReviewers.users.find(
-              ({login}) => login === review.user?.login
-            )
-          )
-        })
-      ) {
-        return 'TO_CHANGE'
-      }
-
-      if (
-        requestedReviewers.users.length > 0 ||
-        requestedReviewers.teams.length > 0
-      ) {
-        return 'TO_REVIEW'
-      }
-
-      if (uniqueByUserReviews.find(review => review.state === 'APPROVED')) {
-        return 'TO_MERGE'
-      }
-      return 'OTHER'
-    })()
-
-    const mergeStatus: PRStatus =
-      mergeableState === 'CONFLICTING' ? 'TO_REBASE' : 'OTHER'
-
-    const computedStatuses: PRStatus[] = [reviewStatus, mergeStatus].filter(
-      status => status !== 'OTHER'
-    )
-    core.info(`Computed statuses : ${computedStatuses.join(',')}`)
-
-    const labelMap = defaultLabelMap
-    const computedLabels = computedStatuses
-      .map(status => labelMap[status])
-      .filter(Boolean)
-
-    const toAddLabels: Label[] = []
-    for (const computedLabel of computedLabels) {
-      if (!computedLabel) {
-        continue
-      }
-      if (!currentLabels.find(label_ => label_.name === computedLabel.name)) {
-        toAddLabels.push(computedLabel)
-      }
-    }
-
-    core.info(
-      `Current labels : ${
-        currentLabels.map(label => label.name).join(',') || 'none'
-      }`
-    )
-    const toRemoveLabels: Label[] = []
-    const mappedLabels = Object.values(labelMap)
-    const currentSyncedLabels = currentLabels.filter(currentLabel =>
-      mappedLabels.find(mappedLabel => mappedLabel?.name === currentLabel.name)
-    )
-    for (const currentLabel of currentSyncedLabels) {
-      if (!computedLabels.find(label_ => label_?.name === currentLabel.name)) {
-        toRemoveLabels.push(currentLabel as Label) // name property is optional
-      }
-    }
-
-    if (toAddLabels.length > 0) {
-      core.info(
-        `Adding labels : ${toAddLabels.map(label => label.name).join(',')}`
-      )
-      await addLabels(number, toAddLabels)
-    }
-
-    if (toRemoveLabels.length > 0) {
-      core.info(
-        `Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`
-      )
-      await removeLabels(number, toRemoveLabels)
-    }
-  } catch (error) {
-    core.setFailed(error.message)
-  }
 }
 
 run()

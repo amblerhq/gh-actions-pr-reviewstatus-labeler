@@ -38,6 +38,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(186));
 const github = __importStar(__nccwpck_require__(438));
+const DEFAULT_LABEL_MAP = {
+    TO_REVIEW: { name: '🚦status:to-review', color: 'FBCA04' },
+    TO_CHANGE: { name: '🚦status:to-change', color: 'C2E0C6' },
+    TO_MERGE: { name: '🚦status:to-merge', color: '0E8A16' },
+    TO_REBASE: { name: '🚦status:to-rebase', color: 'FBCA04' }
+};
 const token = core.getInput('GITHUB_TOKEN', { required: true });
 if (!token) {
     core.setFailed('Missing GITHUB_TOKEN');
@@ -45,28 +51,132 @@ if (!token) {
 }
 const octokit = github.getOctokit(token);
 const { owner, repo } = github.context.repo;
-// const Clubhouse = require('clubhouse-lib');
-// const clubhouseToken = process.env.INPUT_CLUBHOUSETOKEN;
-// const client = Clubhouse.create(clubhouseToken);
-/**
- * Finds all clubhouse story IDs in some string content.
- *
- * @param {string} content - content that may contain story IDs.
- * @return {Array} - Clubhouse story IDs 1-7 digit strings.
- */
-function extractStoryIds(content) {
-    const regex = /(?<=ch)\d{1,7}/g;
-    const all = content.match(regex);
-    const unique = [...new Set(all)];
-    return unique;
+function run() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const labelMap = DEFAULT_LABEL_MAP; //TODO permit to override
+            const pullRequest = yield getPullRequest();
+            const { number, state, draft, mergeable_state: mergeableState, labels: currentLabels } = pullRequest;
+            core.info('Fetching PR reviews and requestedReviewers');
+            const reviews = yield getUniqueReviews(number);
+            const requestedReviewers = yield getRequestReviewers(number);
+            const computedLabels = getComputedLabels({
+                draft,
+                mergeableState,
+                state,
+                reviews,
+                requestedReviewers,
+                labelMap
+            });
+            const toAddLabels = getLabelsToAdd(currentLabels, computedLabels);
+            const toRemoveLabels = getLabelsToRemove(currentLabels, computedLabels, labelMap);
+            if (toAddLabels.length > 0) {
+                core.info(`Adding labels : ${toAddLabels.map(label => label.name).join(',')}`);
+                yield addLabels(number, toAddLabels);
+            }
+            if (toRemoveLabels.length > 0) {
+                core.info(`Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`);
+                yield removeLabels(number, toRemoveLabels);
+            }
+        }
+        catch (error) {
+            core.setFailed(error.message);
+        }
+    });
 }
-const defaultLabelMap = {
-    TO_REVIEW: { name: '🚦status:to-review', color: 'FBCA04' },
-    TO_CHANGE: { name: '🚦status:to-change', color: 'C2E0C6' },
-    TO_MERGE: { name: '🚦status:to-merge', color: '0E8A16' },
-    TO_REBASE: { name: '🚦status:to-rebase', color: 'FBCA04' },
-    OTHER: null
-};
+function getPullRequest() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { payload: { pull_request } } = github.context;
+        if (!pull_request) {
+            throw new Error('Pull Request not found');
+        }
+        const pullRequestNumber = pull_request.number;
+        //* We can't use the event payload because some fields are missing for the pull_request_review event
+        const { data: pullRequest } = yield octokit.pulls.get({
+            owner,
+            repo,
+            pull_number: pullRequestNumber
+        });
+        return pullRequest;
+    });
+}
+function getUniqueReviews(pullRequestNumber) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { data: reviews } = yield octokit.pulls.listReviews({
+            owner,
+            repo,
+            pull_number: pullRequestNumber
+        });
+        const uniqueByUserReviews = [];
+        for (const review of reviews.reverse()) {
+            if (!uniqueByUserReviews.find(uniqueReview => { var _a; return review.user && ((_a = uniqueReview.user) === null || _a === void 0 ? void 0 : _a.login) === review.user.login; })) {
+                uniqueByUserReviews.push(review);
+            }
+        }
+        return uniqueByUserReviews;
+    });
+}
+function getRequestReviewers(pullRequestNumber) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { data: requestedReviewers } = yield octokit.pulls.listRequestedReviewers({
+            owner,
+            repo,
+            pull_number: pullRequestNumber
+        });
+        return requestedReviewers;
+    });
+}
+function getComputedLabels({ reviews, requestedReviewers, draft, state, mergeableState, labelMap }) {
+    const reviewStatus = (() => {
+        if (draft || state !== 'open') {
+            return null;
+        }
+        if (reviews.find(review => {
+            return (review.state === 'CHANGES_REQUESTED' &&
+                !requestedReviewers.users.find(({ login }) => { var _a; return login === ((_a = review.user) === null || _a === void 0 ? void 0 : _a.login); }));
+        })) {
+            return 'TO_CHANGE';
+        }
+        if (requestedReviewers.users.length > 0 ||
+            requestedReviewers.teams.length > 0) {
+            return 'TO_REVIEW';
+        }
+        if (reviews.find(review => review.state === 'APPROVED')) {
+            return 'TO_MERGE';
+        }
+        return null;
+    })();
+    const mergeStatus = mergeableState === 'CONFLICTING' ? 'TO_REBASE' : null;
+    const computedStatuses = [reviewStatus, mergeStatus].filter(status => status !== null);
+    core.info(`Computed statuses : ${computedStatuses.join(',')}`);
+    const computedLabels = computedStatuses
+        .map(status => labelMap[status])
+        .filter(Boolean);
+    return computedLabels;
+}
+function getLabelsToAdd(currentLabels, computedLabels) {
+    const toAddLabels = [];
+    for (const computedLabel of computedLabels) {
+        if (!computedLabel) {
+            continue;
+        }
+        if (!currentLabels.find(label_ => label_.name === computedLabel.name)) {
+            toAddLabels.push(computedLabel);
+        }
+    }
+    return toAddLabels;
+}
+function getLabelsToRemove(currentLabels, computedLabels, labelMap) {
+    const toRemoveLabels = [];
+    const mappedLabels = Object.values(labelMap);
+    const currentSyncedLabels = currentLabels.filter(currentLabel => mappedLabels.find(mappedLabel => (mappedLabel === null || mappedLabel === void 0 ? void 0 : mappedLabel.name) === currentLabel.name));
+    for (const currentLabel of currentSyncedLabels) {
+        if (!computedLabels.find(label_ => (label_ === null || label_ === void 0 ? void 0 : label_.name) === currentLabel.name)) {
+            toRemoveLabels.push(currentLabel); // name property is optional
+        }
+    }
+    return toRemoveLabels;
+}
 function addLabels(prNumber, labels) {
     return __awaiter(this, void 0, void 0, function* () {
         //* Create label if needed
@@ -104,107 +214,6 @@ function removeLabels(prNumber, labels) {
                 name: label.name
             });
         })));
-    });
-}
-function run() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const { payload: { pull_request } } = github.context;
-            if (!pull_request) {
-                return;
-            }
-            const pullRequestNumber = pull_request.number;
-            //* We can't use the event payload because some fields are missing for the pull_request_review event
-            const { data: pullRequest } = yield octokit.pulls.get({
-                owner,
-                repo,
-                pull_number: pullRequestNumber
-            });
-            const { number, title, body, state, draft, mergeable_state: mergeableState, labels: currentLabels, head: { ref } } = pullRequest;
-            const content = `${number} ${title} ${body} ${ref}`;
-            core.info(content);
-            core.info(extractStoryIds(content).join(','));
-            core.info('Fetching PR reviews and requestedReviewers');
-            const { data: reviews } = yield octokit.pulls.listReviews({
-                owner,
-                repo,
-                pull_number: number
-            });
-            const uniqueByUserReviews = [];
-            for (const review of reviews.reverse()) {
-                if (!uniqueByUserReviews.find(uniqueReview => { var _a; return review.user && ((_a = uniqueReview.user) === null || _a === void 0 ? void 0 : _a.login) === review.user.login; })) {
-                    uniqueByUserReviews.push(review);
-                }
-            }
-            const { data: requestedReviewers } = yield octokit.pulls.listRequestedReviewers({
-                owner,
-                repo,
-                pull_number: number
-            });
-            core.info(`data : ${JSON.stringify({
-                draft,
-                mergeableState,
-                state,
-                requestedReviewers,
-                reviews,
-                uniqueByUserReviews
-            })}`);
-            const reviewStatus = (() => {
-                if (draft || state !== 'open') {
-                    return 'OTHER';
-                }
-                if (uniqueByUserReviews.find(review => {
-                    return (review.state === 'CHANGES_REQUESTED' &&
-                        !requestedReviewers.users.find(({ login }) => { var _a; return login === ((_a = review.user) === null || _a === void 0 ? void 0 : _a.login); }));
-                })) {
-                    return 'TO_CHANGE';
-                }
-                if (requestedReviewers.users.length > 0 ||
-                    requestedReviewers.teams.length > 0) {
-                    return 'TO_REVIEW';
-                }
-                if (uniqueByUserReviews.find(review => review.state === 'APPROVED')) {
-                    return 'TO_MERGE';
-                }
-                return 'OTHER';
-            })();
-            const mergeStatus = mergeableState === 'CONFLICTING' ? 'TO_REBASE' : 'OTHER';
-            const computedStatuses = [reviewStatus, mergeStatus].filter(status => status !== 'OTHER');
-            core.info(`Computed statuses : ${computedStatuses.join(',')}`);
-            const labelMap = defaultLabelMap;
-            const computedLabels = computedStatuses
-                .map(status => labelMap[status])
-                .filter(Boolean);
-            const toAddLabels = [];
-            for (const computedLabel of computedLabels) {
-                if (!computedLabel) {
-                    continue;
-                }
-                if (!currentLabels.find(label_ => label_.name === computedLabel.name)) {
-                    toAddLabels.push(computedLabel);
-                }
-            }
-            core.info(`Current labels : ${currentLabels.map(label => label.name).join(',') || 'none'}`);
-            const toRemoveLabels = [];
-            const mappedLabels = Object.values(labelMap);
-            const currentSyncedLabels = currentLabels.filter(currentLabel => mappedLabels.find(mappedLabel => (mappedLabel === null || mappedLabel === void 0 ? void 0 : mappedLabel.name) === currentLabel.name));
-            for (const currentLabel of currentSyncedLabels) {
-                if (!computedLabels.find(label_ => (label_ === null || label_ === void 0 ? void 0 : label_.name) === currentLabel.name)) {
-                    toRemoveLabels.push(currentLabel); // name property is optional
-                }
-            }
-            if (toAddLabels.length > 0) {
-                core.info(`Adding labels : ${toAddLabels.map(label => label.name).join(',')}`);
-                yield addLabels(number, toAddLabels);
-            }
-            if (toRemoveLabels.length > 0) {
-                core.info(`Removing labels : ${toRemoveLabels.map(label => label.name).join(',')}`);
-                yield removeLabels(number, toRemoveLabels);
-            }
-        }
-        catch (error) {
-            core.setFailed(error.message);
-        }
     });
 }
 run();

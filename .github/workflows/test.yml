@@ -12,10 +12,9 @@ on: # rebuild any PRs and main branch changes
         closed
       ]
   pull_request_review:
-  #push:
 
 jobs:
-  pre_job:
+  prevent_parallel_runs:
     # continue-on-error: true # Uncomment once integration is finished
     runs-on: ubuntu-latest
     # Map a step output to a job output
@@ -27,8 +26,8 @@ jobs:
         with:
           concurrent_skipping: 'same_content'
   build: # make sure build/ci work properly
-    needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    needs: prevent_parallel_runs
+    if: ${{ needs.prevent_parallel_runs.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
