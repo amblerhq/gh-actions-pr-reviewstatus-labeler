@@ -1,8 +1,8 @@
 {
-  "name": "gh-actions-clubhouse-labeler",
+  "name": "gh-actions-pr-reviewstatus-labeler",
   "version": "0.0.0",
   "private": true,
-  "description": "Github Action to add/Remove labels on a Clubhouse story based on its linked Pull Request",
+  "description": "Github Action to add/remove labels on Pull Request based on its review status",
   "main": "lib/main.js",
   "scripts": {
     "build": "tsc",
@@ -15,11 +15,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/amblerhq/gh-actions-clubhouse-labeler"
+    "url": "git+https://github.com/amblerhq/gh-actions-pr-reviewstatus-labeler"
   },
   "keywords": [
+    "github",
     "actions",
-    "clubhouse",
+    "review",
     "label"
   ],
   "author": "",

@@ -1,5 +1,5 @@
-name: 'Chab'
-description: 'Add/remove labels on a Clubhouse story based on its linked Pull Request'
+name: 'gh-actions-pr-reviewstatus-labeler'
+description: 'Add/remove labels on Pull Request based on its review status'
 author: 'Ambler'
 inputs:
   GITHUB_TOKEN:
