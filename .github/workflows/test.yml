@@ -24,7 +24,7 @@ jobs:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@master
         with:
-          concurrent_skipping: 'same_content'
+          skip_after_successful_duplicate: false
   build: # make sure build/ci work properly
     needs: prevent_parallel_runs
     if: ${{ needs.prevent_parallel_runs.outputs.should_skip != 'true' }}
