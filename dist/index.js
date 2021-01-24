@@ -108,9 +108,11 @@ function getUniqueReviews(pullRequestNumber) {
             pull_number: pullRequestNumber
         });
         const uniqueByUserReviews = [];
-        for (const review of reviews.reverse()) {
-            if (!uniqueByUserReviews.find(uniqueReview => { var _a; return review.user && ((_a = uniqueReview.user) === null || _a === void 0 ? void 0 : _a.login) === review.user.login; })) {
-                uniqueByUserReviews.push(review);
+        for (const candidate of reviews
+            .filter(review => ['CHANGES_REQUESTED', 'APPROVED'].includes(review.state))
+            .reverse()) {
+            if (!uniqueByUserReviews.find(uniqueReview => { var _a; return candidate.user && ((_a = uniqueReview.user) === null || _a === void 0 ? void 0 : _a.login) === candidate.user.login; })) {
+                uniqueByUserReviews.push(candidate);
             }
         }
         return uniqueByUserReviews;

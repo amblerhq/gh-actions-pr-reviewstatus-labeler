@@ -113,14 +113,16 @@ async function getUniqueReviews(pullRequestNumber: number): Promise<Reviews> {
     pull_number: pullRequestNumber
   })
   const uniqueByUserReviews: Reviews = []
-  for (const review of reviews.reverse()) {
+  for (const candidate of reviews
+    .filter(review => ['CHANGES_REQUESTED', 'APPROVED'].includes(review.state))
+    .reverse()) {
     if (
       !uniqueByUserReviews.find(
         uniqueReview =>
-          review.user && uniqueReview.user?.login === review.user.login
+          candidate.user && uniqueReview.user?.login === candidate.user.login
       )
     ) {
-      uniqueByUserReviews.push(review)
+      uniqueByUserReviews.push(candidate)
     }
   }
   return uniqueByUserReviews
