@@ -14,22 +14,7 @@ on: # rebuild any PRs and main branch changes
   pull_request_review:
 
 jobs:
-  prevent_parallel_runs:
-    # continue-on-error: true # Uncomment once integration is finished
-    runs-on: ubuntu-latest
-    # Map a step output to a job output
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
-        with:
-          skip_after_successful_duplicate: false
-          concurrent_skipping: outdated_runs
-
-  build: # make sure build/ci work properly
-    needs: prevent_parallel_runs
-    if: ${{ needs.prevent_parallel_runs.outputs.should_skip != 'true' }}
+  build:
     strategy:
       max-parallel: 1
     runs-on: ubuntu-latest
