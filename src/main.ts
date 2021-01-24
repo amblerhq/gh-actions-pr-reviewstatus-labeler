@@ -5,7 +5,6 @@ type PullRequest = {
   number: number
   state: string
   draft?: boolean
-  mergeable_state: string
   labels: Label[]
 }
 
@@ -20,7 +19,7 @@ type RequestedReviewers = {
   users: {login: string}[]
 }
 
-type PRStatus = 'TO_REVIEW' | 'TO_CHANGE' | 'TO_MERGE' | 'TO_REBASE'
+type PRStatus = 'TO_REVIEW' | 'TO_CHANGE' | 'TO_MERGE'
 
 type Label = {name?: string; color?: string}
 
@@ -29,8 +28,7 @@ type LabelMap = Record<PRStatus, Label>
 const DEFAULT_LABEL_MAP: LabelMap = {
   TO_REVIEW: {name: '🚦status:to-review', color: 'FBCA04'},
   TO_CHANGE: {name: '🚦status:to-change', color: 'C2E0C6'},
-  TO_MERGE: {name: '🚦status:to-merge', color: '0E8A16'},
-  TO_REBASE: {name: '🚦status:to-rebase', color: 'FBCA04'}
+  TO_MERGE: {name: '🚦status:to-merge', color: '0E8A16'}
 }
 
 const token = core.getInput('GITHUB_TOKEN', {required: true})
@@ -159,7 +157,7 @@ function getComputedLabels({
   requestedReviewers: RequestedReviewers
   labelMap: LabelMap
 }): Label[] {
-  const {state, draft, mergeable_state: mergeableState} = pullRequest
+  const {state, draft} = pullRequest
 
   const reviewStatus = ((): PRStatus | null => {
     if (draft || state !== 'open') {
@@ -189,19 +187,10 @@ function getComputedLabels({
     return null
   })()
 
-  const mergeStatus: PRStatus | null =
-    mergeableState === 'CONFLICTING' ? 'TO_REBASE' : null
-
-  const computedStatuses: PRStatus[] = [reviewStatus, mergeStatus].filter(
-    status => status !== null
-  ) as PRStatus[]
-  core.info(`Computed statuses : ${computedStatuses.join(',')}`)
-
-  const computedLabels = computedStatuses
-    .map(status => labelMap[status])
-    .filter(Boolean)
-
-  return computedLabels
+  if (!reviewStatus) {
+    return []
+  }
+  return [labelMap[reviewStatus]]
 }
 
 function getLabelsToAdd(
@@ -277,8 +266,8 @@ async function removeLabels(prNumber: number, labels: Label[]): Promise<void> {
         return
       }
       return octokit.issues.removeLabel({
-        owner: github.context.repo.owner,
-        repo: github.context.repo.repo,
+        owner,
+        repo,
         issue_number: prNumber,
         name: label.name
       })

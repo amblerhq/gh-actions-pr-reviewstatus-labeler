@@ -41,8 +41,7 @@ const github = __importStar(__nccwpck_require__(438));
 const DEFAULT_LABEL_MAP = {
     TO_REVIEW: { name: '🚦status:to-review', color: 'FBCA04' },
     TO_CHANGE: { name: '🚦status:to-change', color: 'C2E0C6' },
-    TO_MERGE: { name: '🚦status:to-merge', color: '0E8A16' },
-    TO_REBASE: { name: '🚦status:to-rebase', color: 'FBCA04' }
+    TO_MERGE: { name: '🚦status:to-merge', color: '0E8A16' }
 };
 const token = core.getInput('GITHUB_TOKEN', { required: true });
 if (!token) {
@@ -132,7 +131,7 @@ function getRequestReviewers(pullRequestNumber) {
     });
 }
 function getComputedLabels({ reviews, requestedReviewers, pullRequest, labelMap }) {
-    const { state, draft, mergeable_state: mergeableState } = pullRequest;
+    const { state, draft } = pullRequest;
     const reviewStatus = (() => {
         if (draft || state !== 'open') {
             return null;
@@ -151,13 +150,10 @@ function getComputedLabels({ reviews, requestedReviewers, pullRequest, labelMap 
         }
         return null;
     })();
-    const mergeStatus = mergeableState === 'CONFLICTING' ? 'TO_REBASE' : null;
-    const computedStatuses = [reviewStatus, mergeStatus].filter(status => status !== null);
-    core.info(`Computed statuses : ${computedStatuses.join(',')}`);
-    const computedLabels = computedStatuses
-        .map(status => labelMap[status])
-        .filter(Boolean);
-    return computedLabels;
+    if (!reviewStatus) {
+        return [];
+    }
+    return [labelMap[reviewStatus]];
 }
 function getLabelsToAdd(currentLabels, computedLabels) {
     const toAddLabels = [];
@@ -219,8 +215,8 @@ function removeLabels(prNumber, labels) {
                 return;
             }
             return octokit.issues.removeLabel({
-                owner: github.context.repo.owner,
-                repo: github.context.repo.repo,
+                owner,
+                repo,
                 issue_number: prNumber,
                 name: label.name
             });
