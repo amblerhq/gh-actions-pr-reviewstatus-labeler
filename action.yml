@@ -1,6 +1,9 @@
 name: 'gh-actions-pr-reviewstatus-labeler'
 description: 'Add/remove labels on Pull Request based on its review status'
 author: 'Ambler'
+branding:
+  icon: 'award'
+  color: 'purple'
 inputs:
   GITHUB_TOKEN:
     required: true
