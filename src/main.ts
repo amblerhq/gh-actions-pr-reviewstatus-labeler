@@ -229,34 +229,20 @@ function getLabelsToRemove(
 
 async function addLabels(prNumber: number, labels: Label[]): Promise<void> {
   //* Create label if needed
-  const {data: existingLabels} = await octokit.issues.listLabelsForRepo({
-    owner,
-    repo
-  })
   for (const label of labels) {
     if (!label.name) {
       continue
     }
-    const remoteLabel = existingLabels.find(
-      label_ => label.name === label_.name
-    )
-    if (!remoteLabel) {
-      core.info(
-        `Creating label ${label.name} (not found in ${JSON.stringify(
-          existingLabels
-        )}`
-      )
-      try {
-        const response = await octokit.issues.createLabel({
-          owner,
-          repo,
-          name: label.name,
-          color: label.color
-        })
-        core.info(JSON.stringify(response))
-      } catch (e) {
-        core.warning(`Creation failed: ${e.message}`)
-      }
+    try {
+      const response = await octokit.issues.createLabel({
+        owner,
+        repo,
+        name: label.name,
+        color: label.color
+      })
+      core.info(JSON.stringify(response))
+    } catch (e) {
+      core.warning(`Creation failed: ${e.message}`)
     }
   }
 

@@ -181,29 +181,21 @@ function getLabelsToRemove(currentLabels, computedLabels, labelMap) {
 function addLabels(prNumber, labels) {
     return __awaiter(this, void 0, void 0, function* () {
         //* Create label if needed
-        const { data: existingLabels } = yield octokit.issues.listLabelsForRepo({
-            owner,
-            repo
-        });
         for (const label of labels) {
             if (!label.name) {
                 continue;
             }
-            const remoteLabel = existingLabels.find(label_ => label.name === label_.name);
-            if (!remoteLabel) {
-                core.info(`Creating label ${label.name} (not found in ${JSON.stringify(existingLabels)}`);
-                try {
-                    const response = yield octokit.issues.createLabel({
-                        owner,
-                        repo,
-                        name: label.name,
-                        color: label.color
-                    });
-                    core.info(JSON.stringify(response));
-                }
-                catch (e) {
-                    core.warning(`Creation failed: ${e.message}`);
-                }
+            try {
+                const response = yield octokit.issues.createLabel({
+                    owner,
+                    repo,
+                    name: label.name,
+                    color: label.color
+                });
+                core.info(JSON.stringify(response));
+            }
+            catch (e) {
+                core.warning(`Creation failed: ${e.message}`);
             }
         }
         yield octokit.issues.addLabels({
