@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.4](https://github.com/amblerhq/gh-actions-pr-reviewstatus-labeler/compare/v1.0.3...v1.0.4) (2021-01-25)
+
+
+### Bug Fixes
+
+* fix build files ([6bcdd61](https://github.com/amblerhq/gh-actions-pr-reviewstatus-labeler/commit/6bcdd61101e092136baf90b11909f5d90bd82c0c))
+
 ### [1.0.3](https://github.com/amblerhq/gh-actions-pr-reviewstatus-labeler/compare/v1.0.2...v1.0.3) (2021-01-25)
 
 ### [1.0.2](https://github.com/amblerhq/gh-actions-pr-reviewstatus-labeler/compare/v1.0.1...v1.0.2) (2021-01-25)
