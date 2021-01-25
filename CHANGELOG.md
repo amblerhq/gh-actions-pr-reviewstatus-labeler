@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.5](https://github.com/amblerhq/gh-actions-pr-reviewstatus-labeler/compare/v1.0.4...v1.0.5) (2021-01-25)
+
+
+### Bug Fixes
+
+* stop query existing labels ([09d2a33](https://github.com/amblerhq/gh-actions-pr-reviewstatus-labeler/commit/09d2a33d11f8348dc963399fbe68a8be1842d725))
+
 ### [1.0.4](https://github.com/amblerhq/gh-actions-pr-reviewstatus-labeler/compare/v1.0.3...v1.0.4) (2021-01-25)
 
 
