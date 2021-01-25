@@ -1,6 +1,6 @@
 {
   "name": "gh-actions-pr-reviewstatus-labeler",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "description": "Github Action to add/remove labels on Pull Request based on its review status",
   "main": "lib/main.js",
