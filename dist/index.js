@@ -190,14 +190,20 @@ function addLabels(prNumber, labels) {
                 continue;
             }
             const remoteLabel = existingLabels.find(label_ => label.name === label_.name);
-            if (!remoteLabel && label.name) {
-                const response = yield octokit.issues.createLabel({
-                    owner,
-                    repo,
-                    name: label.name,
-                    color: label.color
-                });
-                core.info(JSON.stringify(response));
+            if (!remoteLabel) {
+                core.info(`Creating label ${label.name} (not found in ${JSON.stringify(existingLabels)}`);
+                try {
+                    const response = yield octokit.issues.createLabel({
+                        owner,
+                        repo,
+                        name: label.name,
+                        color: label.color
+                    });
+                    core.info(JSON.stringify(response));
+                }
+                catch (e) {
+                    core.warning(`Creation failed: ${e.message}`);
+                }
             }
         }
         yield octokit.issues.addLabels({
