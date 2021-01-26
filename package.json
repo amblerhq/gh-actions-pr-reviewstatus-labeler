@@ -12,7 +12,8 @@
     "package": "ncc build --source-map --license licenses.txt",
     "all": "npm run build && npm run format && npm run lint && npm run package",
     "test:git-dirty": "[[ -z $(git status -s) ]] || (echo 'Your git worktree is dirty. Please stash or remove.' && /usr/bin/false)",
-    "release": "yarn all && yarn test:git-dirty && yarn standard-version",
+    "release": "yarn test:git-dirty && yarn standard-version",
+    "push": "git push origin :refs/tags/v1 && git tag -fa v1 -m v1 && git push --follow-tags origin master",
     "pre-commit": "yarn all"
   },
   "husky": {
