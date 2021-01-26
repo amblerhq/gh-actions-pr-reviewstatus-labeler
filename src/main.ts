@@ -242,7 +242,7 @@ async function addLabels(prNumber: number, labels: Label[]): Promise<void> {
       })
       core.info(JSON.stringify(response))
     } catch (e) {
-      core.warning(`Creation failed: ${e.message}`)
+      core.warning(`Creation of ${label.name} failed: ${e.message}`)
     }
   }
 
@@ -260,12 +260,16 @@ async function removeLabels(prNumber: number, labels: Label[]): Promise<void> {
       if (!label.name) {
         return
       }
-      return octokit.issues.removeLabel({
-        owner,
-        repo,
-        issue_number: prNumber,
-        name: label.name
-      })
+      try {
+        octokit.issues.removeLabel({
+          owner,
+          repo,
+          issue_number: prNumber,
+          name: label.name
+        })
+      } catch (e) {
+        core.warning(`Removing failed: ${e.message}`)
+      }
     })
   )
 }
